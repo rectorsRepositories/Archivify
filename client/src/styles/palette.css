@@ -1,0 +1,103 @@
+/* Sunlit archive palette: orange canvas, buttery cards, dark ink. */
+.app-shell {
+  background:
+    radial-gradient(circle at 78% 4%, rgba(255, 183, 91, .62), transparent 28%),
+    radial-gradient(circle at 9% 88%, rgba(189, 35, 16, .22), transparent 34%),
+    linear-gradient(150deg, var(--canvas-top) 0%, var(--canvas-middle) 48%, var(--canvas-bottom) 100%);
+}
+
+.welcome-panel {
+  border-color: #ddad54;
+  background:
+    radial-gradient(circle at 79% 44%, rgba(255, 183, 77, .54), transparent 37%),
+    linear-gradient(115deg, #fff5c5 0%, #ffedac 58%, #ffdb8f 100%);
+  box-shadow: 0 18px 45px rgba(134, 38, 13, .24), inset 0 1px rgba(255,255,255,.7);
+}
+.welcome-panel::after { background: repeating-linear-gradient(90deg, transparent 0 34px, rgba(174, 104, 29, .025) 35px 36px); }
+.welcome-content h1, .welcome-content h1 span { color: var(--ink); }
+.welcome-content p, .welcome-caption { color: var(--ink-muted); }
+.hero-art img { border-color: #f0cc79; }
+.eyebrow, .overview-label, .preview-badge { color: var(--ink); }
+.welcome-panel .eyebrow, .album-hero .eyebrow { color: var(--rust); }
+.status-dot { background: #ff7c2a; box-shadow: 0 0 0 3px rgba(255, 132, 48, .2); }
+
+.overview-card, .album-card, .game-card, .quick-card, .heading-stat, .empty-state {
+  border-color: var(--butter-line);
+  background: linear-gradient(150deg, var(--butter-light), var(--butter-deep));
+  box-shadow: 0 10px 25px rgba(111, 34, 12, .17), inset 0 1px rgba(255,255,255,.68);
+  color: var(--ink);
+}
+.overview-card:hover, .album-card:hover, .game-card:hover, .quick-card:hover { border-color: #a95623; }
+.overview-card-body > span { color: #78411f; }
+.storage-value strong, .metric-value, .overview-card-body p span { color: var(--ink); }
+.storage-value small, .metric-value small, .overview-card-body p { color: var(--ink-muted); }
+.overview-icon, .overview-icon.amber, .overview-icon.plum, .quick-icon {
+  background: #ffd279;
+  color: var(--rust);
+}
+.progress-track { background: #e4c77f; }
+.progress-track span { background: linear-gradient(90deg, #d94f1b, #ff8e31); }
+
+.section-header h2, .section-header p, .results-heading h2, .results-heading p,
+.page-heading h1, .page-heading p, .track-section .section-header h2,
+.home-footer { color: var(--ink); }
+.page-heading .heading-dot { color: var(--butter-light); }
+.text-link { color: var(--ink); }
+.text-link:hover { color: #6b2712; }
+.album-meta strong, .game-info h3, .quick-card strong, .heading-stat strong { color: var(--ink); }
+.album-meta span, .game-info p, .quick-card small, .heading-stat small,
+.album-meta small, .quick-arrow { color: var(--ink-muted); }
+.game-platform { border-color: rgba(255, 223, 142, .85); }
+.game-info button {
+  border-color: #d25e22;
+  background: #e96326;
+  color: #fff7e7;
+}
+.game-info button:hover { background: #bc4019; border-color: #aa3516; }
+
+.search-field, .filter-chip, .select-wrap {
+  border-color: var(--butter-line);
+  background: var(--butter);
+  color: #6d4025;
+}
+.search-field:focus-within { border-color: #a44318; box-shadow: 0 0 0 3px rgba(255,233,166,.32); }
+.search-field input, .select-wrap select { color: var(--ink); }
+.search-field input::placeholder { color: var(--ink-muted); }
+.search-field button { color: #9b5c34; }
+.select-wrap select option { background: var(--butter); color: var(--ink); }
+.filter-chip:hover { color: #572819; border-color: #a5471b; }
+.filter-chip.selected {
+  border-color: #9c3819;
+  background: linear-gradient(180deg, #bc491b, #8f2d16);
+  color: #fff8e6;
+  box-shadow: 0 5px 14px rgba(125, 29, 10, .22);
+}
+.filter-row { border-bottom-color: rgba(255, 229, 167, .55); }
+.toolbar-count { color: var(--ink); }
+.results-heading h2 span, .section-count { color: var(--ink); background: var(--butter); }
+.empty-state h3, .empty-state h1, .empty-state p { color: #4e2d1c; }
+
+.breadcrumbs, .breadcrumbs a { color: var(--ink); }
+.breadcrumbs a:hover { color: #6b2712; }
+.album-hero {
+  border-color: #dda654;
+  background: #ffecae;
+  box-shadow: 0 18px 40px rgba(119, 32, 11, .2);
+}
+.album-hero-backdrop { opacity: .22; }
+.album-hero::after { background: linear-gradient(90deg, rgba(255,244,197,.92), rgba(255,228,152,.78)); }
+.album-hero-info h1 { color: #402217; }
+.album-artist { color: #ae4719; }
+.album-description, .album-tags { color: #68442d; }
+.genre-tags span { border-color: #d59a51; background: #ffdc8e; color: #813913; }
+.album-actions .secondary-button { border-color: #c77a3a; background: #ffe2a0; color: #612d16; }
+
+.track-list-wrap { border-color: #dba654; background: #fff0b7; box-shadow: 0 10px 25px rgba(111,34,12,.15); }
+.track-list-head { border-bottom-color: #d8a958; background: #f9dc8a; color: #7f431f; }
+.track-row { border-bottom-color: #e4bf76; }
+.track-row:hover { background: #ffe49d; }
+.track-title strong { color: #402619; }
+.track-title small, .track-number, .track-data { color: #805638; }
+.row-icon { color: #a9471b; }
+.row-icon:hover { border-color: #c9672b; background: #ffd484; color: #793013; }
+.track-format { color: var(--ink); }

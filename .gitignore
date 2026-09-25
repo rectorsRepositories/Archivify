@@ -1,0 +1,33 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Personal archive data (media, games, and other large source files)
+/archive/
+
+# Generated SQLite index and SQLite sidecar files
+/data/archive.db
+/data/archive.db-shm
+/data/archive.db-wal
+/data/archive.db-journal
+
+# Installed dependencies and generated output
+node_modules/
+dist/
+coverage/
+
+# Runtime and package-manager logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS and editor-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.idea/
