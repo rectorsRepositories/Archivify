@@ -6,13 +6,22 @@
 </p>
 
 
-The archive API reads the SQLite index and serves metadata and indexed files. It
-runs independently of the Vite client.
+Home Archive indexes media in a local SQLite database. Its API serves metadata
+and indexed files, and the Vite client provides a browser interface. The API
+can run independently of the client.
 
 ## Set up a fresh clone
 
-Install Git and Node.js 22 or newer with npm. On the machine that will host the
-archive, clone the repository and install its dependencies from the lockfile:
+Install Git and Node.js 22 or newer with npm. On Ubuntu, install the native
+build tools first: `better-sqlite3` may need to compile during `npm ci`.
+
+```sh
+sudo apt update
+sudo apt install -y build-essential python3
+```
+
+Clone the repository on the machine that will run the archive, then install
+dependencies from the lockfile:
 
 ```sh
 git clone <repository-url> home-archive
@@ -20,31 +29,41 @@ cd home-archive
 npm ci
 ```
 
-The media in `archive/`, the SQLite database in `data/`, and `.env` are ignored by
-Git, so a clone does not contain them. Copy or mount your media separately. By
-default, the indexer looks in `/Archive`; otherwise set `ARCHIVE_ROOT` to the
-directory containing the case-sensitive `Music`, `Games`, `Pictures`, and `Videos`
-folders. The server must be able to read the media and write the database
-directory. On a new machine, create a fresh index rather than copying a database
-whose file records contain absolute paths from another machine.
+If an earlier `npm ci` failed with `gyp ERR! stack Error: not found: make`, run
+the Ubuntu prerequisite commands above and retry `npm ci` in the repository.
+
+Media in `archive/`, the SQLite database in `data/`, and `.env` are ignored by
+Git, so a clone does not contain them. Copy or mount your media separately. Set
+`ARCHIVE_ROOT` to the directory containing the `Music`, `Games`, `Pictures`, and
+`Videos` folders. Folder names must match that capitalization on case-sensitive
+file systems. If `ARCHIVE_ROOT` is unset, the indexer uses `/Archive`, a default
+path that may need changing for your system. The process must be able to read
+the media and write to the database directory. Create a fresh index on each
+machine because file records contain absolute paths.
 
 ## Environment variables
 
 Set variables in the shell before running an npm command, or configure them in
 the environment of the service that starts the application. For example, from
-the repository root on Ubuntu:
+the repository root, use the syntax for your shell:
+
+**POSIX shell (Linux or macOS):**
 
 ```sh
-export ARCHIVE_ROOT=/srv/home-archive/archive
-export ARCHIVE_DB=/srv/home-archive/data/archive.db
-export HOST=127.0.0.1
-export PORT=3000
+export ARCHIVE_ROOT="$(pwd)/archive"
 ```
 
-Only `ARCHIVE_ROOT` needs to be set if the media is not mounted at `/Archive`;
-the other values above show their defaults. Relative paths are resolved from the
-directory where the command is run, so use absolute paths for a server service.
-Variables set with `export` apply to the current shell and commands it starts.
+**PowerShell (Windows, Linux, or macOS):**
+
+```powershell
+$env:ARCHIVE_ROOT = (Join-Path (Get-Location) 'archive')
+```
+
+These examples assume the media is in the repository's `archive/` directory;
+use the path to your media if it is elsewhere. The other variables are optional.
+Relative paths are resolved from the directory where the command is run, so
+use absolute paths for a service. Shell variables apply to that shell session
+and the commands it starts.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -57,15 +76,15 @@ Variables set with `export` apply to the current shell and commands it starts.
 | `IGDB_REFRESH` | unset | Set to `1` for an indexing run to look up games that already have IGDB matches again. |
 | `GAME_EXTRA_EXTENSIONS` | unset | Optional comma- or space-separated extra game file suffixes for `index:games`, such as `.rom,.foo`. Leading dots and letter case are optional. |
 
-An `.env` file can hold local values and is ignored by Git, but the current npm
-scripts do **not** load it automatically. On Ubuntu, load a shell-compatible
-`.env` file before running commands with `set -a; . ./.env; set +a`, or export
-the variables directly. Keep credentials out of the repository.
+An `.env` file can hold local values and is ignored by Git, but the npm scripts
+do **not** load it automatically. Load its values using a method supported by
+your shell or process manager, or set the variables directly before running
+commands. Keep credentials out of version control.
 
 ## Build the index
 
-From the repository root, after the archive is mounted and the environment is
-set, run:
+From the repository root, after the media is available and `ARCHIVE_ROOT` is
+set if needed, run:
 
 ```sh
 npm run index
@@ -79,7 +98,7 @@ command again after adding or changing files. To run a stage separately, use
 file stage first when the archive contents have changed.
 
 The file indexer leaves records for deleted files in place by default. After
-confirming that the archive is mounted and readable, remove stale records with:
+confirming that the media is available and readable, remove stale records with:
 
 ```sh
 npm run index:files -- --prune
@@ -129,10 +148,9 @@ npm run preview
 ```
 
 The build goes into `client/dist`. Preview starts or reuses the API and serves
-the built client, with `/api` proxied to the local API. The current preview
-configuration listens on `0.0.0.0` (Vite's default preview port is 4173), so
-it is local to the server unless you change that configuration or put it behind
-a reverse proxy. Music and games pages use indexed data.
+the built client, with `/api` proxied to the local API. Preview binds to
+`127.0.0.1` by default on Vite's default preview port, 4173, so it is available
+on the machine running it. Music and games pages use indexed data.
 
 ## API
 
