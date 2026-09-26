@@ -1,5 +1,11 @@
 # Home Archive
 
+<!-- ![Home Archive homepage](homepage.png) -->
+<p align="center">
+  <img src="homepage.png" alt="Project Banner" width="600">
+</p>
+
+
 The archive API reads the SQLite index and serves metadata and indexed files. It
 runs independently of the Vite client.
 
@@ -49,6 +55,7 @@ Variables set with `export` apply to the current shell and commands it starts.
 | `IGDB_CLIENT_ID` | unset | Optional Twitch developer application client ID for game metadata lookup during indexing. |
 | `IGDB_CLIENT_SECRET` | unset | Optional matching client secret. Both IGDB credentials must be set for lookup; neither is needed to serve the API. |
 | `IGDB_REFRESH` | unset | Set to `1` for an indexing run to look up games that already have IGDB matches again. |
+| `GAME_EXTRA_EXTENSIONS` | unset | Optional comma- or space-separated extra game file suffixes for `index:games`, such as `.rom,.foo`. Leading dots and letter case are optional. |
 
 An `.env` file can hold local values and is ignored by Git, but the current npm
 scripts do **not** load it automatically. On Ubuntu, load a shell-compatible
@@ -83,15 +90,25 @@ npm run index:games
 Missing category folders are reported and skipped. On a new machine, use a new
 database so old absolute file paths do not remain in the index.
 
-The game indexer recognizes `.iso`, `.chd`, `.cso`, and `.zso` disc images under
-`Games/<platform>/`. BIOS files remain in the generic file index. For optional
-IGDB metadata and cover art, set `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET` from a
-Twitch developer application before running `npm run index:games`. The indexer
-stores matched metadata locally; the API needs no IGDB credentials at runtime.
-Matching requires both the title and platform to agree, so unmatched games keep
-their filename title and nullable metadata. A `<game name>.game.json` file beside
-the disc image can override `title`, `platform`, `release_year`, and `genre`; a
-matching `.jpg`, `.jpeg`, `.png`, or `.webp` file is used as local cover art.
+The game indexer accepts any `Games/<platform>/` folder name. It recognizes
+common disc images (`.iso`, `.chd`, `.cso`, `.zso`, `.ciso`, `.gcm`, `.rvz`, `.wbfs`,
+`.cdi`, `.pbp`) and console formats including `.nes`, `.sfc`, `.smc`, `.n64`,
+`.z64`, `.gb`, `.gbc`, `.gba`, `.nds`, `.3ds`, `.sms`, `.gg`, `.md`, `.gen`, `.xci`,
+and `.nsp`. Other supported suffixes are listed in `src/indexers/gameIndexer.js`.
+For an uncommon format, set `GAME_EXTRA_EXTENSIONS` before running
+`npm run index:games`; the file must first be in the generic file index.
+Ambiguous files such as `.bin`, `.cue`, `.gdi`, `.m3u`, and archives are not
+classified as games by default. BIOS files remain in the generic file index.
+
+For optional IGDB metadata and cover art, set `IGDB_CLIENT_ID` and
+`IGDB_CLIENT_SECRET` from a Twitch developer application before running
+`npm run index:games`. The indexer stores matched metadata locally; the API
+needs no IGDB credentials at runtime. IGDB matching requires both the title and
+platform to agree, so use the platform's IGDB name for its folder when possible.
+Unmatched games keep their filename title and nullable metadata. A
+`<game name>.game.json` file beside a game can override `title`, `platform`,
+`release_year`, and `genre`; a `.jpg`, `.jpeg`, `.png`, or `.webp` file with the
+same name stem beside the game is used as local cover art.
 
 ## Start the API and client
 

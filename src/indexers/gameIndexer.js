@@ -5,9 +5,24 @@ const db = require("../db/database");
 const { createIgdbClient } = require("./igdb");
 require("../db/schema");
 
-// Limit the first catalog pass to self-contained disc images. In particular,
-// .bin files can be BIOS data or companions to a cue sheet, not games by name.
-const GAME_EXTENSIONS = new Set([".iso", ".chd", ".cso", ".zso"]);
+// Index standalone game files across console generations. Ambiguous support
+// files such as .bin, .cue, .gdi, and .m3u are excluded by default because they
+// may be BIOS files or parts of a multi-file game.
+const GAME_EXTENSIONS = new Set([
+    ".iso", ".chd", ".cso", ".zso", ".ciso", ".gcm", ".rvz", ".wbfs", ".cdi", ".pbp",
+    ".nes", ".fds", ".unf", ".unif", ".sfc", ".smc", ".n64", ".v64", ".z64",
+    ".gb", ".gbc", ".gba", ".nds", ".3ds", ".cia", ".xci", ".nsp", ".wud", ".wux",
+    ".sms", ".gg", ".sg", ".md", ".smd", ".gen", ".32x", ".pce", ".sgx",
+    ".a26", ".a52", ".a78", ".lnx", ".j64", ".ngp", ".ngc", ".ws", ".wsc",
+]);
+
+for (const value of (process.env.GAME_EXTRA_EXTENSIONS || "").split(/[\s,]+/).filter(Boolean)) {
+    const extension = value.replace(/^\./, "").toLowerCase();
+    if (!/^[a-z0-9]+$/.test(extension)) {
+        throw new Error("Invalid GAME_EXTRA_EXTENSIONS entry: " + value);
+    }
+    GAME_EXTENSIONS.add("." + extension);
+}
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 const getFiles = db.prepare(

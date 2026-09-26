@@ -203,7 +203,7 @@ function initializeSchema() {
         );
 
 
-        -- One playable disc image per game record. BIOS and other supporting
+        -- One game file per game record. BIOS and other supporting
         -- files remain in files without becoming games. Optional metadata may
         -- come from a sidecar file; missing values stay NULL.
         CREATE TABLE IF NOT EXISTS games (
