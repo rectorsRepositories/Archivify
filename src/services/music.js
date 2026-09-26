@@ -82,6 +82,7 @@ function publicAlbums(rows) {
             ? "/api/v1/music/albums/" + row.id + "/artwork"
             : null,
         tracks_url: "/api/v1/music/albums/" + row.id + "/tracks",
+        download_url: "/api/v1/music/albums/" + row.id + "/download",
     }));
 }
 
@@ -268,6 +269,15 @@ function getAlbumArtwork(id) {
     ).get(id);
 }
 
+function listAlbumFiles(sourceKey) {
+    return db.prepare(
+        "SELECT path, relative_path, filename, size, modified_at FROM files " +
+        "WHERE category = 'music' AND " +
+        "instr(replace(relative_path, char(92), '/'), ? || '/') = 1 " +
+        "ORDER BY relative_path COLLATE NOCASE, id"
+    ).all(sourceKey);
+}
+
 module.exports = {
     listAlbums,
     getAlbum,
@@ -276,4 +286,5 @@ module.exports = {
     listTracks,
     getTrack,
     getAlbumArtwork,
+    listAlbumFiles,
 };

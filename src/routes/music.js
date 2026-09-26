@@ -11,6 +11,7 @@ const {
 const music = require("../services/music");
 const { getFile } = require("../services/files");
 const { sendIndexedFile } = require("./downloads");
+const { sendAlbumDownload } = require("./albumDownload");
 
 function optionalYear(searchParams) {
     return searchParams.has("year")
@@ -100,6 +101,13 @@ async function routeMusic(req, res, url) {
 
     if (match) {
         await sendArtwork(req, res, parseId(match[1]));
+        return true;
+    }
+
+    match = /^\/api\/v1\/music\/albums\/(\d+)\/download$/.exec(pathname);
+
+    if (match) {
+        await sendAlbumDownload(req, res, parseId(match[1]));
         return true;
     }
 

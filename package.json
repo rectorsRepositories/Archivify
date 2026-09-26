@@ -4,14 +4,16 @@
   "private": true,
   "scripts": {
     "start": "node src/server.js",
-    "dev": "vite --config client/vite.config.mjs --configLoader runner --host 0.0.0.0",
+    "dev": "node scripts/serve-client.js dev",
     "build": "vite build --config client/vite.config.mjs --configLoader runner",
-    "preview": "vite preview --config client/vite.config.mjs --configLoader runner --host 0.0.0.0",
+    "preview": "node scripts/serve-client.js preview",
     "index:files": "node src/indexers/fileIndexer.js",
     "index:music": "node src/indexers/musicIndexer.js",
-    "index": "npm run index:files && npm run index:music"
+    "index:games": "node src/indexers/gameIndexer.js",
+    "index": "npm run index:files && npm run index:music && npm run index:games"
   },
   "dependencies": {
+    "archiver": "^8.0.0",
     "better-sqlite3": "^13.0.3",
     "lucide-react": "^0.468.0",
     "music-metadata": "^11.16.1",

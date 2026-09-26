@@ -203,6 +203,27 @@ function initializeSchema() {
         );
 
 
+        -- One playable disc image per game record. BIOS and other supporting
+        -- files remain in files without becoming games. Optional metadata may
+        -- come from a sidecar file; missing values stay NULL.
+        CREATE TABLE IF NOT EXISTS games (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id INTEGER NOT NULL UNIQUE,
+            source_key TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            release_year INTEGER,
+            genre TEXT,
+            artwork_file_id INTEGER,
+            igdb_id INTEGER,
+            igdb_cover_image_id TEXT,
+            summary TEXT,
+            igdb_url TEXT,
+            FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+            FOREIGN KEY (artwork_file_id) REFERENCES files(id) ON DELETE SET NULL
+        );
+
+
         -- ---------------------------------------------------------------------
         -- Files indexes
         -- ---------------------------------------------------------------------
@@ -260,6 +281,11 @@ function initializeSchema() {
 
         CREATE INDEX IF NOT EXISTS idx_track_artists_artist
             ON track_artists(artist_id);
+
+        CREATE INDEX IF NOT EXISTS idx_games_title ON games(title);
+        CREATE INDEX IF NOT EXISTS idx_games_platform ON games(platform);
+        CREATE INDEX IF NOT EXISTS idx_games_release_year ON games(release_year);
+        CREATE INDEX IF NOT EXISTS idx_games_genre ON games(genre);
     `);
 }
 

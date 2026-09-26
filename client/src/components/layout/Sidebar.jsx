@@ -43,7 +43,7 @@ export default function Sidebar({ notify }) {
       <div className="sidebar-bottom">
         <div className="server-card">
           <span className="server-icon"><HardDrive size={19} /></span>
-          <span><strong>Home server</strong><small><i className="status-dot" /> Preview · Mock data</small></span>
+          <span><strong>Home server</strong><small>Local archive API</small></span>
         </div>
         <p>Made for everything<br />you want to keep.</p>
       </div>

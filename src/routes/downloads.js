@@ -157,4 +157,5 @@ async function routeDownloads(req, res, url) {
 module.exports = {
     routeDownloads,
     sendIndexedFile,
+    attachmentHeader,
 };

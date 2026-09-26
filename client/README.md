@@ -1,6 +1,6 @@
 # Archive client
 
-A responsive Vite and React preview for the local archive server. All current library content is mock data; no backend connection, streaming, downloads, or general file manager is implemented yet.
+A responsive Vite and React client for the local archive API. Home, Music, and Games use indexed data.
 
 ## Run
 
@@ -11,16 +11,18 @@ npm install
 npm run dev
 ```
 
-Open the address printed by Vite (normally `http://localhost:5173/`). Use `npm run build` for a production build in `client/dist`, or `npm run preview` to preview it.
+Open the address printed by Vite (normally `http://127.0.0.1:5173/`). This command starts the API if needed and proxies `/api` requests to it. Use `npm start` to run the API by itself. Use `npm run build` for a production build in `client/dist`, then `npm run preview` to serve that build with the API.
 
 ## Pages
 
-- `/` — dashboard with storage overview and recent additions
-- `/music` — searchable, filterable album library
-- `/music/albums/:id` — album detail and track listing
-- `/games` — searchable, filterable games shelf
+- `/` — indexed file, music, and game totals with album and game shelves
+- `/music` — searchable, filterable indexed album library
+- `/music/albums/:id` — album details, artwork, track downloads, and a ZIP of the album folder
+- `/games` — searchable, filterable indexed game library with file downloads
 
-Artwork is stored in `public/art`. The mock content lives in `src/data`; future fetch helpers live in `src/api` and are not connected to the preview UI.
+Music artwork and audio come from the API. Starting an album or track opens a player that continues across pages, with play/pause, previous/next, and volume controls. You can add individual tracks or whole albums to its queue. Browsers may not support every indexed audio format; individual tracks can still be downloaded. Game cover art comes from matching local images or IGDB when configured during indexing.
+
+Download album retrieves a ZIP that extracts to one folder, preserving the album's indexed files and subfolders.
 
 ## Artwork prompts
 

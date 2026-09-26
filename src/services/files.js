@@ -83,6 +83,10 @@ function librarySummary() {
                 "SELECT COALESCE(SUM(duration_ms), 0) AS total FROM tracks"
             ).get().total,
         },
+        games: {
+            titles: db.prepare("SELECT COUNT(*) AS count FROM games").get().count,
+            platforms: db.prepare("SELECT COUNT(DISTINCT platform) AS count FROM games").get().count,
+        },
     };
 }
 
