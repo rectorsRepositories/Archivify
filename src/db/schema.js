@@ -56,12 +56,47 @@ function initializeSchema() {
         --
         -- album_artists handles the many-to-many relationship between
         -- albums and artists.
+        -- source_key is the path to the album directory relative to Music;
+        -- it keeps the album ID stable across rescans and retagging.
+        -- Metadata fields are nullable because tags may be absent.
         -- ---------------------------------------------------------------------
 
         CREATE TABLE IF NOT EXISTS albums (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            title TEXT NOT NULL
+            source_key TEXT NOT NULL UNIQUE,
+
+            title TEXT NOT NULL,
+
+            release_year INTEGER,
+
+            genre TEXT,
+
+            artwork_file_id INTEGER,
+
+            FOREIGN KEY (artwork_file_id)
+                REFERENCES files(id)
+                ON DELETE SET NULL
+        );
+
+
+        -- ---------------------------------------------------------------------
+        -- Embedded album artwork
+        --
+        -- Used only when no indexed cover image file is available. Keeping
+        -- the image in a separate table avoids loading it in album listings.
+        -- ---------------------------------------------------------------------
+
+        CREATE TABLE IF NOT EXISTS album_artwork (
+            album_id INTEGER PRIMARY KEY,
+
+            mime_type TEXT NOT NULL,
+
+            image_data BLOB NOT NULL,
+
+            FOREIGN KEY (album_id)
+                REFERENCES albums(id)
+                ON DELETE CASCADE
         );
 
 
@@ -86,6 +121,12 @@ function initializeSchema() {
             track_number INTEGER,
 
             disc_number INTEGER,
+
+            duration_ms INTEGER,
+
+            release_year INTEGER,
+
+            genre TEXT,
 
             FOREIGN KEY (file_id)
                 REFERENCES files(id)
@@ -185,6 +226,15 @@ function initializeSchema() {
 
         CREATE INDEX IF NOT EXISTS idx_albums_title
             ON albums(title);
+
+        CREATE INDEX IF NOT EXISTS idx_albums_release_year
+            ON albums(release_year);
+
+        CREATE INDEX IF NOT EXISTS idx_albums_genre
+            ON albums(genre);
+
+        CREATE INDEX IF NOT EXISTS idx_albums_artwork_file_id
+            ON albums(artwork_file_id);
 
 
         -- ---------------------------------------------------------------------

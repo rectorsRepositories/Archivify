@@ -4,13 +4,14 @@ A responsive Vite and React preview for the local archive server. All current li
 
 ## Run
 
+From the repository root:
+
 ```sh
-cd client
 npm install
 npm run dev
 ```
 
-Open the address printed by Vite (normally `http://localhost:5173/`). Use `npm run build` for a production build.
+Open the address printed by Vite (normally `http://localhost:5173/`). Use `npm run build` for a production build in `client/dist`, or `npm run preview` to preview it.
 
 ## Pages
 
