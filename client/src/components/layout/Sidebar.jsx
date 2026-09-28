@@ -18,7 +18,7 @@ export default function Sidebar({ notify }) {
     <aside className="sidebar">
       <NavLink to="/" className="brand" aria-label="Archive home">
         <span className="brand-mark"><Archive size={23} strokeWidth={2.3} /></span>
-        <span className="brand-copy"><strong>archive<span className="brand-dot">.</span></strong><small>YOUR SPACE, FOREVER</small></span>
+        <span className="brand-copy"><strong>archivify<span className="brand-dot">.</span></strong><small>YOUR SPACE, FOREVER</small></span>
       </NavLink>
 
       <div className="sidebar-nav-wrap">
