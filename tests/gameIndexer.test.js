@@ -23,12 +23,13 @@ test("indexes console files and matching local covers without treating support f
     const nesRoot = path.join(archiveRoot, "Games", "Nintendo Entertainment System");
     const n64Root = path.join(archiveRoot, "Games", "Nintendo 64");
     const ps2Root = path.join(archiveRoot, "Games", "PlayStation 2");
+    const wiiRoot = path.join(archiveRoot, "Games", "Wii");
 
     try {
         for (const category of ["Music", "Games", "Pictures", "Videos"]) {
             fs.mkdirSync(path.join(archiveRoot, category), { recursive: true });
         }
-        for (const directory of [nesRoot, n64Root, ps2Root, path.join(nesRoot, "BIOS")]) {
+        for (const directory of [nesRoot, n64Root, ps2Root, wiiRoot, path.join(nesRoot, "BIOS")]) {
             fs.mkdirSync(directory, { recursive: true });
         }
         for (const file of [
@@ -41,6 +42,11 @@ test("indexes console files and matching local covers without treating support f
             path.join(ps2Root, "Shadow Realm.iso"),
             path.join(ps2Root, "Track.bin"),
             path.join(ps2Root, "Track.cue"),
+            path.join(wiiRoot, "Kirby's Epic Yarn (USA) (En,Fr,Es).iso"),
+            path.join(wiiRoot, "Kirby's Epic Yarn (USA) (En,Fr,Es).png"),
+            path.join(wiiRoot, "New Super Mario Bros. Wii (USA) (En,Fr,Es) (Rev 2).rvz"),
+            path.join(wiiRoot, "Legend of Zelda, The - Twilight Princess (USA) (En,Fr,Es) (Rev 2).rvz"),
+            path.join(wiiRoot, "Game (HD).iso"),
         ]) {
             fs.writeFileSync(file, "fixture");
         }
@@ -83,6 +89,30 @@ test("indexes console files and matching local covers without treating support f
                     platform: "PlayStation 2",
                     cover: null,
                 },
+                {
+                    source_key: "Wii/Game (HD).iso",
+                    title: "Game (HD)",
+                    platform: "Wii",
+                    cover: null,
+                },
+                {
+                    source_key: "Wii/Kirby's Epic Yarn (USA) (En,Fr,Es).iso",
+                    title: "Kirby's Epic Yarn",
+                    platform: "Wii",
+                    cover: "Kirby's Epic Yarn (USA) (En,Fr,Es).png",
+                },
+                {
+                    source_key: "Wii/Legend of Zelda, The - Twilight Princess (USA) (En,Fr,Es) (Rev 2).rvz",
+                    title: "The Legend of Zelda: Twilight Princess",
+                    platform: "Wii",
+                    cover: null,
+                },
+                {
+                    source_key: "Wii/New Super Mario Bros. Wii (USA) (En,Fr,Es) (Rev 2).rvz",
+                    title: "New Super Mario Bros. Wii",
+                    platform: "Wii",
+                    cover: null,
+                },
             ]);
         } finally {
             db.close();
@@ -115,4 +145,30 @@ test("matches a full console folder name to the same IGDB platform name", () => 
     };
     assert.equal(matchGame([result], "Super Mario Bros.", "Nintendo Entertainment System"), result);
     assert.equal(matchGame([result], "Super Mario Bros.", "Nintendo 64"), null);
+});
+
+test("fails a file indexing run when the configured archive root is missing", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "home-archive-missing-root-"));
+    try {
+        const result = spawnSync(process.execPath, [path.join(projectRoot, "src/indexers/fileIndexer.js")], {
+            cwd: projectRoot,
+            env: {
+                ...process.env,
+                ARCHIVE_ROOT: path.join(tempRoot, "missing"),
+                ARCHIVE_DB: path.join(tempRoot, "archive.db"),
+            },
+            encoding: "utf8",
+        });
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /No archive files were scanned/);
+    } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+});
+
+test("removes ROM release tags before matching IGDB while preserving title qualifiers", () => {
+    const { matchGame } = require("../src/indexers/igdb");
+    const result = { name: "Kirby's Epic Yarn", platforms: [{ name: "Wii" }] };
+    assert.equal(matchGame([result], "Kirby's Epic Yarn", "Wii"), result);
+    assert.equal(matchGame([result], "Kirby's Epic Yarn", "Nintendo 64"), null);
 });

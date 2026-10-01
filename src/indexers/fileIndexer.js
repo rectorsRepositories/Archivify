@@ -11,7 +11,9 @@ require("../db/schema");
 // -----------------------------------------------------------------------------
 
 const ARCHIVE_ROOT = path.resolve(
-    process.env.ARCHIVE_ROOT || "/Archive"
+    process.env.ARCHIVE_ROOT || (process.platform === "win32"
+        ? path.join(__dirname, "../../archive")
+        : "/Archive")
 );
 
 /*
@@ -667,7 +669,11 @@ function runIndexer() {
 
 if (require.main === module) {
     try {
-        runIndexer();
+        const stats = runIndexer();
+        if (stats.scanned === 0 && stats.errors > 0) {
+            console.error("No archive files were scanned. Check ARCHIVE_ROOT; the index was not updated.");
+            process.exitCode = 1;
+        }
     } catch (error) {
         console.error(
             "\nIndexer failed:"

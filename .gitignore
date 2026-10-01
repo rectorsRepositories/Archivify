@@ -11,6 +11,7 @@
 /data/archive.db-shm
 /data/archive.db-wal
 /data/archive.db-journal
+/data/archive.db.before-*
 
 # Installed dependencies and generated output
 node_modules/

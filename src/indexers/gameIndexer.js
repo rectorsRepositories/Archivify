@@ -50,6 +50,28 @@ function cleanTitle(value) {
     return value.replace(/[\uF03A\uFF1A]/g, ":").replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function gameTitleFromStem(stem) {
+    let title = stem;
+    // ROM sets put release information at the end of the filename. Remove only
+    // recognized tags so a title with meaningful parentheses stays intact.
+    const releaseTag = /\s*(?:\(([^()]*)\)|\[([^\[\]]*)\])$/;
+    const region = /^(?:USA|Europe|Japan|World|Australia|Asia|Brazil|Canada|China|France|Germany|Italy|Korea|Netherlands|Russia|Spain|Taiwan|UK)(?:\s*,\s*(?:USA|Europe|Japan|World|Australia|Asia|Brazil|Canada|China|France|Germany|Italy|Korea|Netherlands|Russia|Spain|Taiwan|UK))*$/i;
+    const languages = /^(?:En|Fr|Es|De|It|Ja|Ko|Zh|Pt|Ru|Nl|Sv|Da|No|Fi)(?:\s*,\s*(?:En|Fr|Es|De|It|Ja|Ko|Zh|Pt|Ru|Nl|Sv|Da|No|Fi))*$/i;
+    const revision = /^(?:Rev(?:ision)?\s*[a-z0-9.]+|v\d+(?:\.\d+)*|Disc\s*\d+(?:\s*of\s*\d+)?|Disk\s*\d+(?:\s*of\s*\d+)?)$/i;
+    while (true) {
+        const match = title.match(releaseTag);
+        if (!match) break;
+        const tag = (match[1] ?? match[2]).trim();
+        if (!region.test(tag) && !languages.test(tag) && !revision.test(tag) && tag !== "!") break;
+        title = title.slice(0, match.index);
+    }
+    title = cleanTitle(title || stem);
+    // Some dumps move a leading article after the name and use a dash before
+    // the subtitle, while catalogues put the article first and use a colon.
+    return title.replace(/^(.+), (The|A|An) - (.+)$/i,
+        (_, name, article, subtitle) => `${article} ${name}: ${subtitle}`);
+}
+
 function text(value) {
     return typeof value === "string" ? value.trim() : "";
 }
@@ -62,7 +84,7 @@ function parseGameFile(file) {
     if (parts.length < 2 || parts.some((part) => /\bbios\b/i.test(part))) return null;
 
     const platform = cleanTitle(parts[0]);
-    const title = cleanTitle(path.parse(file.filename).name);
+    const title = gameTitleFromStem(path.parse(file.filename).name);
     if (!platform || !title) return null;
 
     return {
@@ -128,9 +150,9 @@ async function runGameIndexer() {
         const metadata = sidecarMetadata(game);
         const existing = getExisting.get(game.sourceKey);
         let match = null;
-        if (igdb && (!existing?.igdb_id || process.env.IGDB_REFRESH === "1")) {
+        if (igdb && (!existing?.igdb_id || !existing?.igdb_cover_image_id || process.env.IGDB_REFRESH === "1")) {
             try {
-                match = await igdb.lookup(text(metadata.title) || game.title, game.platform);
+                match = await igdb.lookup(text(metadata.title) || game.title, text(metadata.platform) || game.platform);
                 if (match) enriched++;
             } catch (error) {
                 console.warn("IGDB lookup failed for " + game.sourceKey + ": " + error.message);
@@ -167,4 +189,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { runGameIndexer, parseGameFile };
+module.exports = { runGameIndexer, parseGameFile, gameTitleFromStem };

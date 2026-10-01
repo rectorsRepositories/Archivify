@@ -36,8 +36,8 @@ Media in `archive/`, the SQLite database in `data/`, and `.env` are ignored by
 Git, so a clone does not contain them. Copy or mount your media separately. Set
 `ARCHIVE_ROOT` to the directory containing the `Music`, `Games`, `Pictures`, and
 `Videos` folders. Folder names must match that capitalization on case-sensitive
-file systems. If `ARCHIVE_ROOT` is unset, the indexer uses `/Archive`, a default
-path that may need changing for your system. The process must be able to read
+file systems. If `ARCHIVE_ROOT` is unset, the indexer uses the repository's
+`archive/` directory on Windows and `/Archive` on other systems. The process must be able to read
 the media and write to the database directory. Create a fresh index on each
 machine because file records contain absolute paths.
 
@@ -67,7 +67,7 @@ and the commands it starts.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ARCHIVE_ROOT` | `/Archive` | Media root scanned by `index:files`; contains `Music`, `Games`, `Pictures`, and `Videos`. |
+| `ARCHIVE_ROOT` | `archive/` on Windows; `/Archive` elsewhere | Media root scanned by `index:files`; contains `Music`, `Games`, `Pictures`, and `Videos`. |
 | `ARCHIVE_DB` | `data/archive.db` in the repository | SQLite index used by the API and all three indexers. Its parent directory is created if needed. |
 | `HOST` | `127.0.0.1` | Address where the API listens when started with `npm start` or by `npm run dev` / `npm run preview`. Use `0.0.0.0` only when the API itself should accept network connections. |
 | `PORT` | `3000` | API port, also used by the Vite `/api` proxy. Must be an integer from 1 to 65535. |
@@ -124,7 +124,11 @@ For optional IGDB metadata and cover art, set `IGDB_CLIENT_ID` and
 `npm run index:games`. The indexer stores matched metadata locally; the API
 needs no IGDB credentials at runtime. IGDB matching requires both the title and
 platform to agree, so use the platform's IGDB name for its folder when possible.
-Unmatched games keep their filename title and nullable metadata. A
+Common trailing ROM tags such as `(USA)`, `(En,Fr,Es)`, and `(Rev 1)` are
+removed from the displayed title and IGDB search, while the indexed filename
+and same-stem local cover lookup remain unchanged. Games that still lack cover
+art are retried on the next `index:games` run when IGDB is configured.
+Unmatched games keep their cleaned filename title and nullable metadata. A
 `<game name>.game.json` file beside a game can override `title`, `platform`,
 `release_year`, and `genre`; a `.jpg`, `.jpeg`, `.png`, or `.webp` file with the
 same name stem beside the game is used as local cover art.
