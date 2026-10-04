@@ -456,9 +456,10 @@ const saveAlbum = db.transaction((group, details, stats) => {
     stats.albumsIndexed++;
 });
 
-async function runMusicIndexer() {
-    // music-metadata is ESM; the rest of the server currently uses CommonJS.
-    const { parseFile, selectCover } = await import("music-metadata");
+async function runMusicIndexer(metadataReader) {
+    // Accept a reader so indexing behavior can be exercised with deterministic
+    // metadata; CLI runs still load the real ESM parser on demand.
+    const { parseFile, selectCover } = metadataReader || await import("music-metadata");
     const { groups, audioFiles, skipped } = collectAlbums();
     const stats = {
         audioFiles,
