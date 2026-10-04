@@ -1,4 +1,5 @@
 const db = require("../db/database");
+const { indexedPhrase } = require("./search");
 
 const ALBUM_COLUMNS =
     "a.id, a.source_key, a.title, a.release_year, a.genre, " +
@@ -114,6 +115,15 @@ function listAlbums(filters, page) {
     const values = [];
 
     if (filters.q) {
+        const phrase = indexedPhrase(filters.q);
+        if (phrase) {
+            conditions.push(
+                "(a.id IN (SELECT rowid FROM albums_fts WHERE albums_fts MATCH ?) " +
+                "OR a.id IN (SELECT album_id FROM album_artists WHERE artist_id IN " +
+                "(SELECT rowid FROM artists_fts WHERE artists_fts MATCH ?)))"
+            );
+            values.push(phrase, phrase);
+        }
         conditions.push(
             "(instr(lower(a.title), lower(?)) > 0 OR EXISTS " +
             "(SELECT 1 FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id " +
@@ -167,6 +177,11 @@ function listArtists(filters, page) {
     const values = [];
 
     if (filters.q) {
+        const phrase = indexedPhrase(filters.q);
+        if (phrase) {
+            conditions.push("ar.id IN (SELECT rowid FROM artists_fts WHERE artists_fts MATCH ?)");
+            values.push(phrase);
+        }
         conditions.push("instr(lower(ar.name), lower(?)) > 0");
         values.push(filters.q);
     }
@@ -205,6 +220,15 @@ function listTracks(filters, page) {
     const values = [];
 
     if (filters.q) {
+        const phrase = indexedPhrase(filters.q);
+        if (phrase) {
+            conditions.push(
+                "(t.id IN (SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH ?) " +
+                "OR t.id IN (SELECT track_id FROM track_artists WHERE artist_id IN " +
+                "(SELECT rowid FROM artists_fts WHERE artists_fts MATCH ?)))"
+            );
+            values.push(phrase, phrase);
+        }
         conditions.push(
             "(instr(lower(t.title), lower(?)) > 0 OR EXISTS " +
             "(SELECT 1 FROM track_artists ta JOIN artists ar ON ar.id = ta.artist_id " +

@@ -9,7 +9,8 @@ of scope. The coverage targets below now have corresponding test suites.
 `npm test` uses Node's built-in test runner. The suites now cover Priority 1 API
 behavior, file and game indexing, music indexing with generated WAV and injected
 metadata, schema constraints, music API and album ZIP delivery, and mocked IGDB
-requests. The suites use temporary files and SQLite databases. API tests start
+requests. Search index backfill, updates, and unchanged substring results are
+covered as well. The suites use temporary files and SQLite databases. API tests start
 the server in a separate process on an ephemeral localhost port.
 
 `tests/fileIndexer.test.js` injects symlink directory entries and a directory
@@ -43,7 +44,7 @@ actual symlinks or changing permissions is restricted.
 | Server and `http.js` | Health GET/HEAD; unknown route; unsupported method and `Allow`; JSON error shape; invalid IDs, years, limits, offsets, and oversized text filters | Correct status, headers, body; HEAD has no body; invalid input returns 400; methods return 405 |
 | File lists and summary | Empty database; combined q/category/extension/path filters; path segment boundary; sorting; default, max, and offset pagination; totals independent of page size | Relative paths and URLs only; stable ordering; category and aggregate counts match seeded rows |
 | File content/download | Full GET/HEAD; known MIME and binary fallback; attachment filename encoding; empty file; missing DB row; indexed path removed from disk | Correct bytes and headers; 404 for missing rows or unavailable files; no arbitrary path input |
-| Byte ranges | Closed, open ended, and suffix ranges; oversized end; invalid/multiple/unsatisfiable ranges; GET and HEAD | 206 and exact `Content-Range`/length for valid ranges; 416 with `bytes */size` for invalid ranges |
+| Byte ranges | Closed, open ended, and suffix ranges; oversized end; malformed and unsatisfiable ranges; unsupported units, multipart requests, `If-Range`, and HEAD | 206 and exact `Content-Range`/length for valid GET ranges; 416 for malformed/unsatisfiable byte ranges; full responses when ranges are unsupported or cannot apply |
 | Games API | List/detail, q/platform/genre/year filters, pagination, 404, local cover vs IGDB cover URL precedence | Response fields and URLs agree with DB rows and filters |
 
 ## Priority 2: indexing and data lifecycle
@@ -74,6 +75,11 @@ actual symlinks or changing permissions is restricted.
 - `tests/schema.test.js`: schema initialization, uniqueness, and foreign keys.
 - `tests/musicApi.test.js`: music service/routes, artwork, and album ZIPs.
 - `tests/igdb.test.js`: matching, authentication, request escaping, and retry.
+- `tests/searchIndex.test.js`: FTS backfill, synchronization, and search behavior.
+
+GitHub Actions runs these tests on Windows and Ubuntu with Node.js 22 and 24.
+`npm run benchmark:search` compares the substring scan with the FTS candidate
+path on synthetic in-memory data.
 
 Run `npm test` after changes. Keep each suite independent and safe for the test
 runner's parallel file execution.

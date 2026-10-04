@@ -35,7 +35,14 @@ function parseRange(header, size) {
         return null;
     }
 
-    const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+    const value = header.trim();
+    // Only single byte ranges are implemented. HTTP permits ignoring an
+    // unsupported range unit or a multipart request and sending the full file.
+    if (!/^bytes=/i.test(value) || value.includes(",")) {
+        return null;
+    }
+
+    const match = /^bytes=(\d*)-(\d*)$/i.exec(value);
 
     if (!match || (!match[1] && !match[2]) || size === 0) {
         return false;
@@ -94,7 +101,11 @@ async function sendIndexedFile(req, res, file, download = false) {
     }
 
     const size = stats.size;
-    const range = parseRange(req.headers.range, size);
+    // Range applies to GET. Without a response validator, If-Range cannot be
+    // confirmed, so send the complete file in that case as well.
+    const range = req.method === "GET" && !req.headers["if-range"]
+        ? parseRange(req.headers.range, size)
+        : null;
 
     if (range === false) {
         res.writeHead(416, {

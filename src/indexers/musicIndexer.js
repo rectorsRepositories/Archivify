@@ -96,6 +96,20 @@ const linkTrackArtist = db.prepare(
     "INSERT INTO track_artists (track_id, artist_id) VALUES (?, ?)"
 );
 
+const reconcileOrphans = db.transaction(() => {
+    const albumsRemoved = db.prepare(
+        "DELETE FROM albums WHERE NOT EXISTS " +
+        "(SELECT 1 FROM tracks WHERE tracks.album_id = albums.id)"
+    ).run().changes;
+    const artistsRemoved = db.prepare(
+        "DELETE FROM artists WHERE NOT EXISTS " +
+        "(SELECT 1 FROM album_artists WHERE album_artists.artist_id = artists.id) " +
+        "AND NOT EXISTS " +
+        "(SELECT 1 FROM track_artists WHERE track_artists.artist_id = artists.id)"
+    ).run().changes;
+    return { albumsRemoved, artistsRemoved };
+});
+
 function displayName(value) {
     return value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -468,8 +482,10 @@ async function runMusicIndexer(metadataReader) {
         missingDurations: 0,
         albumsIndexed: 0,
         albumsCreated: 0,
+        albumsRemoved: 0,
         tracksIndexed: 0,
         tracksCreated: 0,
+        artistsRemoved: 0,
     };
 
     for (const group of groups.values()) {
@@ -477,9 +493,17 @@ async function runMusicIndexer(metadataReader) {
         saveAlbum(group, details, stats);
     }
 
+    // Reconcile only after all current files have been linked. A renamed track
+    // can replace the sole old track without changing its album's source key.
+    const removed = reconcileOrphans();
+    stats.albumsRemoved = removed.albumsRemoved;
+    stats.artistsRemoved = removed.artistsRemoved;
+
     console.log("Audio files found: " + stats.audioFiles);
     console.log("Albums indexed: " + stats.albumsIndexed + " (" + stats.albumsCreated + " new)");
     console.log("Tracks indexed: " + stats.tracksIndexed + " (" + stats.tracksCreated + " new)");
+    console.log("Empty albums removed: " + stats.albumsRemoved);
+    console.log("Unused artists removed: " + stats.artistsRemoved);
     console.log("Audio files skipped: " + stats.skipped);
     console.log("Tag read errors: " + stats.metadataErrors);
     console.log("Tracks without duration: " + stats.missingDurations);

@@ -344,13 +344,6 @@ describe("server API with indexed files and games", () => {
             assert.equal(response.headers.get("content-length"), String(expectedBody.length), range);
             assert.equal(await response.text(), expectedBody, range);
         }
-        const head = await fetch(api.baseUrl + "/api/v1/files/" + ids.song + "/content", {
-            method: "HEAD", headers: { Range: "bytes=2-5" },
-        });
-        assert.equal(head.status, 206);
-        assert.equal(head.headers.get("content-range"), "bytes 2-5/10");
-        assert.equal(head.headers.get("content-length"), "4");
-        assert.equal(await head.text(), "");
         const downloadRange = await fetch(api.baseUrl + "/api/v1/files/" + ids.song + "/download", {
             headers: { Range: "bytes=0-1" },
         });
@@ -361,7 +354,7 @@ describe("server API with indexed files and games", () => {
     });
 
     it("rejects malformed and unsatisfiable ranges", async () => {
-        for (const range of ["bytes=", "bytes=0-1,4-5", "bytes=10-", "bytes=5-3", "bytes=-0"]) {
+        for (const range of ["bytes=", "bytes=10-", "bytes=5-3", "bytes=-0"]) {
             const response = await fetch(api.baseUrl + "/api/v1/files/" + ids.song + "/content", {
                 headers: { Range: range },
             });
@@ -371,11 +364,32 @@ describe("server API with indexed files and games", () => {
             assert.equal(await response.text(), "", range);
         }
         const emptyRange = await fetch(api.baseUrl + "/api/v1/files/" + ids.empty + "/content", {
-            method: "HEAD", headers: { Range: "bytes=0-" },
+            headers: { Range: "bytes=0-" },
         });
         assert.equal(emptyRange.status, 416);
         assert.equal(emptyRange.headers.get("content-range"), "bytes */0");
         assert.equal(await emptyRange.text(), "");
+    });
+
+    it("sends the full file when a range is unsupported or cannot apply", async () => {
+        for (const headers of [
+            { Range: "bytes=0-1,4-5" },
+            { Range: "items=0-1" },
+            { Range: "bytes=0-1", "If-Range": '"stale-etag"' },
+        ]) {
+            const response = await fetch(api.baseUrl + "/api/v1/files/" + ids.song + "/content",
+                { headers });
+            assert.equal(response.status, 200);
+            assert.equal(response.headers.get("content-range"), null);
+            assert.equal(await response.text(), "0123456789");
+        }
+        const head = await fetch(api.baseUrl + "/api/v1/files/" + ids.song + "/content", {
+            method: "HEAD", headers: { Range: "bytes=2-5" },
+        });
+        assert.equal(head.status, 200);
+        assert.equal(head.headers.get("content-length"), "10");
+        assert.equal(head.headers.get("content-range"), null);
+        assert.equal(await head.text(), "");
     });
 
     it("filters and paginates games and chooses local artwork over IGDB artwork", async () => {

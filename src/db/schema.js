@@ -1,4 +1,5 @@
 const db = require("./database");
+const { initializeSearchIndexes } = require("./searchIndex");
 
 // -----------------------------------------------------------------------------
 // Database schema
@@ -287,6 +288,7 @@ function initializeSchema() {
         CREATE INDEX IF NOT EXISTS idx_games_release_year ON games(release_year);
         CREATE INDEX IF NOT EXISTS idx_games_genre ON games(genre);
     `);
+    initializeSearchIndexes();
 }
 
 // -----------------------------------------------------------------------------

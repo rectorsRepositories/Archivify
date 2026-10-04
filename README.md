@@ -109,6 +109,11 @@ npm run index:games
 Missing category folders are reported and skipped. On a new machine, use a new
 database so old absolute file paths do not remain in the index.
 
+After `--prune` removes music files, `index:music` removes albums with no tracks
+and artists with no remaining album or track links. Run both stages in the order
+shown above. An album whose only track was renamed keeps its ID when the new
+track is indexed in the same album folder.
+
 The game indexer accepts any `Games/<platform>/` folder name. It recognizes
 common disc images (`.iso`, `.chd`, `.cso`, `.zso`, `.ciso`, `.gcm`, `.rvz`, `.wbfs`,
 `.cdi`, `.pbp`) and console formats including `.nes`, `.sfc`, `.smc`, `.n64`,
@@ -192,3 +197,22 @@ music tags are null. File paths in JSON are relative to their archive category;
 the API never accepts an arbitrary filesystem path for file delivery. Album
 downloads stream a ZIP containing the indexed album folder, including sidecar
 files such as cover images when present.
+
+Search keeps substring matching. Common searches with at least three plain-text
+characters use SQLite FTS5 to narrow candidates; short and punctuation-heavy
+searches use the original substring query. Existing databases build these search
+indexes once at the next server or indexer startup, so that first startup may
+take longer for a large archive. The indexes stay synchronized as rows change.
+File content supports a single byte range on GET. HEAD, unsupported range units,
+and multipart range requests receive the complete file headers or content.
+
+## Tests and search benchmark
+
+Run `npm test` for the server and indexer suites. Tests create temporary media
+and databases; they do not use the local archive. GitHub Actions runs the suite
+on Windows and Ubuntu with Node.js 22 and 24.
+
+Run `npm run benchmark:search` to compare substring scans with the FTS candidate
+query on 50,000 synthetic in-memory rows. Pass a different row count with
+`npm run benchmark:search -- 100000`. Results depend on the machine and query;
+the benchmark does not access the archive database.

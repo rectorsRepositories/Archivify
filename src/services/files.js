@@ -1,4 +1,5 @@
 const db = require("../db/database");
+const { indexedPhrase } = require("./search");
 
 const FILE_COLUMNS =
     "id, path, relative_path, filename, category, extension, " +
@@ -36,6 +37,11 @@ function listFiles(filters, page) {
     }
 
     if (filters.q) {
+        const phrase = indexedPhrase(filters.q);
+        if (phrase) {
+            conditions.push("id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)");
+            values.push(phrase);
+        }
         conditions.push(
             "(instr(lower(filename), lower(?)) > 0 " +
             "OR instr(lower(relative_path), lower(?)) > 0)"

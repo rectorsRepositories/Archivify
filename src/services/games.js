@@ -1,4 +1,5 @@
 const db = require("../db/database");
+const { indexedPhrase } = require("./search");
 
 const GAME_COLUMNS =
     "g.id, g.title, g.platform, g.release_year, g.genre, " +
@@ -36,6 +37,11 @@ function listGames(filters, page) {
     const conditions = [];
     const values = [];
     if (filters.q) {
+        const phrase = indexedPhrase(filters.q);
+        if (phrase) {
+            conditions.push("g.id IN (SELECT rowid FROM games_fts WHERE games_fts MATCH ?)");
+            values.push(phrase);
+        }
         conditions.push("(instr(lower(g.title), lower(?)) > 0 OR instr(lower(g.platform), lower(?)) > 0)");
         values.push(filters.q, filters.q);
     }

@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const { it } = require("node:test");
 const { createFixture, closeFixture, runIndexer, writeMedia } = require("../test-support/fixture");
@@ -72,6 +73,42 @@ it("reads tagged and untagged WAV files with the real metadata parser", () => {
             "SELECT ar.name FROM track_artists ta JOIN artists ar ON ar.id = ta.artist_id " +
             "JOIN tracks t ON t.id = ta.track_id WHERE t.title = ?"
         ).all("Tagged Tone"), [{ name: "Tagged Artist" }]);
+    } finally {
+        closeFixture(fixture);
+    }
+});
+
+it("reconciles empty albums and unused artists after file pruning without changing retained album IDs", () => {
+    const fixture = createFixture();
+    try {
+        const oldPath = writeMedia(fixture, "music",
+            "wav/Keep_Artist/Keep_Album/01 - Old.wav", pcmWav());
+        const gonePath = writeMedia(fixture, "music",
+            "wav/Remove_Artist/Remove_Album/01 - Gone.wav", pcmWav());
+        assert.equal(runIndexer(fixture, "src/indexers/fileIndexer.js").status, 0);
+        assert.equal(runIndexer(fixture, "src/indexers/musicIndexer.js").status, 0);
+        const keptAlbum = fixture.db.prepare("SELECT id FROM albums WHERE source_key = ?")
+            .get("wav/Keep_Artist/Keep_Album");
+        assert.ok(keptAlbum);
+        assert.equal(fixture.db.prepare("SELECT COUNT(*) AS count FROM albums").get().count, 2);
+
+        fs.unlinkSync(oldPath);
+        fs.unlinkSync(gonePath);
+        writeMedia(fixture, "music", "wav/Keep_Artist/Keep_Album/01 - New.wav", pcmWav());
+        const prune = runIndexer(fixture, "src/indexers/fileIndexer.js", ["--prune"]);
+        assert.equal(prune.status, 0, prune.stderr);
+        // At this stage the old tracks are gone, but album reconciliation waits
+        // until the replacement track has been indexed.
+        assert.equal(fixture.db.prepare("SELECT COUNT(*) AS count FROM albums").get().count, 2);
+        const reindex = runIndexer(fixture, "src/indexers/musicIndexer.js");
+        assert.equal(reindex.status, 0, reindex.stderr);
+        assert.match(reindex.stdout, /Empty albums removed: 1/);
+        assert.match(reindex.stdout, /Unused artists removed: 1/);
+        assert.deepEqual(fixture.db.prepare("SELECT id, source_key FROM albums").all(), [
+            { id: keptAlbum.id, source_key: "wav/Keep_Artist/Keep_Album" },
+        ]);
+        assert.deepEqual(fixture.db.prepare("SELECT title FROM tracks").all(), [{ title: "New" }]);
+        assert.deepEqual(fixture.db.prepare("SELECT name FROM artists").all(), [{ name: "Keep Artist" }]);
     } finally {
         closeFixture(fixture);
     }
