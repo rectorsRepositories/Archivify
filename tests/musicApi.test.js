@@ -44,6 +44,12 @@ describe("music API and album downloads", () => {
         ids.first = addFile(fixture, "music", "Alice/Album/01.mp3", "first");
         ids.second = addFile(fixture, "music", "Alice/Album/02.mp3", "second");
         ids.cover = addFile(fixture, "music", "Alice/Album/cover.jpg", "cover");
+        // Artwork and track delivery must use this fixture's archive even when
+        // the index still contains absolute paths from another machine.
+        fixture.db.prepare("UPDATE files SET path = ? WHERE id = ?")
+            .run("/Archive/Music/Alice/Album/cover.jpg", ids.cover);
+        fixture.db.prepare("UPDATE files SET path = ? WHERE id = ?")
+            .run("/Archive/Music/Alice/Album/01.mp3", ids.first);
         addFile(fixture, "music", "Alice/Album/readme.txt", "notes");
         ids.extra = addFile(fixture, "music", "Alice/Album Extra/01.mp3", "extra");
         ids.embeddedFile = addFile(fixture, "music", "Other/Embedded/01.mp3", "embed");
@@ -151,6 +157,21 @@ describe("music API and album downloads", () => {
         assert.equal(absent.response.status, 404);
         const invalidArtist = await getJson(api.baseUrl, "/api/v1/music/albums?artist_id=0");
         assert.equal(invalidArtist.response.status, 400);
+    });
+
+    it("returns complete album facets and stable server-side sort orders", async () => {
+        const facets = await getJson(api.baseUrl, "/api/v1/music/albums/facets");
+        assert.equal(facets.response.status, 200);
+        assert.deepEqual(facets.body.data, {
+            genres: ["Ambient", "Pop", "Rock"], years: [2021, 2020, 2019],
+        });
+        const newest = await getJson(api.baseUrl, "/api/v1/music/albums?sort=newest&limit=2");
+        assert.deepEqual(newest.body.data.map((item) => item.id), [ids.albumExtra, ids.album]);
+        const oldest = await getJson(api.baseUrl, "/api/v1/music/albums?sort=oldest&limit=2");
+        assert.deepEqual(oldest.body.data.map((item) => item.id), [ids.embedded, ids.album]);
+        const byArtist = await getJson(api.baseUrl, "/api/v1/music/albums?sort=artist&limit=2");
+        assert.deepEqual(byArtist.body.data.map((item) => item.id), [ids.album, ids.albumExtra]);
+        assert.equal((await getJson(api.baseUrl, "/api/v1/music/albums?sort=invalid")).response.status, 400);
     });
 
     it("orders tracks by disc and number and applies track filters", async () => {

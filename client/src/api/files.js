@@ -1,6 +1,3 @@
-export async function getFiles(path = '') {
-  const params = new URLSearchParams({ path })
-  const response = await fetch(`/api/v1/files?${params}`)
-  if (!response.ok) throw new Error(`Archive request failed: ${response.status}`)
-  return response.json()
-}
+import { request, withQuery } from './request.js'
+
+export const listFiles = (params = {}, options) => request(withQuery('/api/v1/files', params), options)

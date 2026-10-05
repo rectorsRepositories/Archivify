@@ -59,11 +59,26 @@ function listGames(filters, page) {
     }
     const where = conditions.length ? " WHERE " + conditions.join(" AND ") : "";
     const total = db.prepare("SELECT COUNT(*) AS count" + GAME_FROM + where).get(...values).count;
+    const sortOrders = {
+        title: "g.title COLLATE NOCASE, g.id",
+        newest: "g.release_year IS NULL, g.release_year DESC, g.title COLLATE NOCASE, g.id",
+        oldest: "g.release_year IS NULL, g.release_year ASC, g.title COLLATE NOCASE, g.id",
+    };
     const rows = db.prepare(
         "SELECT " + GAME_COLUMNS + GAME_FROM + where +
-        " ORDER BY g.title COLLATE NOCASE, g.id LIMIT ? OFFSET ?"
+        " ORDER BY " + sortOrders[filters.sort || "title"] + " LIMIT ? OFFSET ?"
     ).all(...values, page.limit, page.offset);
     return { items: rows.map(publicGame), total };
+}
+
+function gameFacets() {
+    return {
+        platforms: db.prepare("SELECT DISTINCT platform FROM games ORDER BY platform COLLATE NOCASE")
+            .all().map((row) => row.platform),
+        genres: db.prepare("SELECT DISTINCT genre FROM games WHERE genre IS NOT NULL " +
+            "AND trim(genre) <> '' ORDER BY genre COLLATE NOCASE")
+            .all().map((row) => row.genre),
+    };
 }
 
 function getGame(id) {
@@ -71,4 +86,4 @@ function getGame(id) {
     return row ? publicGame(row) : null;
 }
 
-module.exports = { listGames, getGame };
+module.exports = { listGames, gameFacets, getGame };

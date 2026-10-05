@@ -154,12 +154,32 @@ function listAlbums(filters, page) {
     const total = db.prepare(
         "SELECT COUNT(*) AS count FROM albums a" + where
     ).get(...values).count;
+    const sortOrders = {
+        title: "a.title COLLATE NOCASE, a.id",
+        artist: "COALESCE((SELECT MIN(ar.name COLLATE NOCASE) FROM album_artists aa " +
+            "JOIN artists ar ON ar.id = aa.artist_id WHERE aa.album_id = a.id), " +
+            "'Unknown artist') COLLATE NOCASE, " +
+            "a.title COLLATE NOCASE, a.id",
+        newest: "a.release_year IS NULL, a.release_year DESC, a.title COLLATE NOCASE, a.id",
+        oldest: "a.release_year IS NULL, a.release_year ASC, a.title COLLATE NOCASE, a.id",
+    };
     const rows = db.prepare(
         "SELECT " + ALBUM_COLUMNS + " FROM albums a" + where +
-        " ORDER BY a.title COLLATE NOCASE, a.id LIMIT ? OFFSET ?"
+        " ORDER BY " + sortOrders[filters.sort || "title"] + " LIMIT ? OFFSET ?"
     ).all(...values, page.limit, page.offset);
 
     return { items: publicAlbums(rows), total };
+}
+
+function albumFacets() {
+    return {
+        genres: db.prepare("SELECT DISTINCT genre FROM albums WHERE genre IS NOT NULL " +
+            "AND trim(genre) <> '' ORDER BY genre COLLATE NOCASE")
+            .all().map((row) => row.genre),
+        years: db.prepare("SELECT DISTINCT release_year FROM albums " +
+            "WHERE release_year IS NOT NULL ORDER BY release_year DESC")
+            .all().map((row) => row.release_year),
+    };
 }
 
 function getAlbum(id) {
@@ -294,16 +314,21 @@ function getAlbumArtwork(id) {
 }
 
 function listAlbumFiles(sourceKey) {
-    return db.prepare(
-        "SELECT path, relative_path, filename, size, modified_at FROM files " +
+    const rows = db.prepare(
+        "SELECT path, category, relative_path, filename FROM files " +
         "WHERE category = 'music' AND " +
         "instr(replace(relative_path, char(92), '/'), ? || '/') = 1 " +
         "ORDER BY relative_path COLLATE NOCASE, id"
     ).all(sourceKey);
+
+    // A database copied between machines may contain both old and new rows
+    // for the same relative path. Include each archive file only once.
+    return [...new Map(rows.map((row) => [row.relative_path.replace(/\\/g, "/"), row])).values()];
 }
 
 module.exports = {
     listAlbums,
+    albumFacets,
     getAlbum,
     listArtists,
     getArtist,

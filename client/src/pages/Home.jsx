@@ -1,22 +1,21 @@
-import { ArrowUpRight, Database, Download, Gamepad2, HardDrive, Music2, Settings2, Sparkles } from 'lucide-react'
+import { ArrowUpRight, Database, Download, Gamepad2, HardDrive, Music2, Search, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import AlbumGrid from '../components/music/AlbumGrid.jsx'
 import GameGrid from '../components/games/GameGrid.jsx'
 import SectionHeader from '../components/common/SectionHeader.jsx'
-import { getAlbums, getLibrarySummary } from '../api/music.js'
-import { getGames } from '../api/games.js'
+import { listAlbums, getLibrarySummary } from '../api/music.js'
+import { listGames } from '../api/games.js'
 import { formatBytes } from '../api/format.js'
 
 const quickActions = [
   { label: 'Explore music', detail: 'Albums & artists', icon: Music2, to: '/music' },
   { label: 'Browse games', detail: 'Indexed games', icon: Gamepad2, to: '/games' },
-  { label: 'Downloads', detail: 'Available soon', icon: Download },
-  { label: 'Settings', detail: 'Available soon', icon: Settings2 },
+  { label: 'Downloads', detail: 'Albums & games', icon: Download, to: '/downloads' },
+  { label: 'Search archive', detail: 'Find anything', icon: Search, to: '/search' },
 ]
 
 export default function Home() {
-  const { notify } = useOutletContext()
   const [summary, setSummary] = useState(null)
   const [albums, setAlbums] = useState([])
   const [games, setGames] = useState([])
@@ -28,8 +27,8 @@ export default function Home() {
     const controller = new AbortController()
     setLoading(true)
     setError('')
-    Promise.all([getLibrarySummary({ signal: controller.signal }), getAlbums({ signal: controller.signal }), getGames({ signal: controller.signal })])
-      .then(([librarySummary, musicAlbums, archiveGames]) => { setSummary(librarySummary); setAlbums(musicAlbums); setGames(archiveGames) })
+    Promise.all([getLibrarySummary({ signal: controller.signal }), listAlbums({ limit: 4 }, { signal: controller.signal }), listGames({ limit: 4 }, { signal: controller.signal })])
+      .then(([librarySummary, musicAlbums, archiveGames]) => { setSummary(librarySummary); setAlbums(musicAlbums.data); setGames(archiveGames.data) })
       .catch((cause) => { if (cause.name !== 'AbortError') setError(cause.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
@@ -63,7 +62,7 @@ export default function Home() {
         <section className="home-section"><SectionHeader title="From your music shelf" subtitle="Albums in your indexed archive" to="/music" />{albums.length ? <AlbumGrid albums={albums.slice(0, 4)} compact /> : <div className="empty-state">No albums indexed yet.</div>}</section>
         <section className="home-section"><SectionHeader title="From your games shelf" subtitle="Games in your indexed archive" to="/games" />{games.length ? <GameGrid games={games.slice(0, 4)} compact /> : <div className="empty-state">No games indexed yet.</div>}</section>
       </>}
-      <section className="home-section quick-section"><SectionHeader title="Jump back in" subtitle="Everything in its place" /><div className="quick-grid">{quickActions.map(({ label, detail, icon: Icon, to }) => to ? <Link to={to} className="quick-card" key={label}><span className="quick-icon"><Icon size={22} /></span><span><strong>{label}</strong><small>{detail}</small></span><ArrowUpRight size={17} className="quick-arrow" /></Link> : <button type="button" className="quick-card" key={label} onClick={() => notify(`${label} is coming soon`)}><span className="quick-icon"><Icon size={22} /></span><span><strong>{label}</strong><small>{detail}</small></span><ArrowUpRight size={17} className="quick-arrow" /></button>)}</div></section>
+      <section className="home-section quick-section"><SectionHeader title="Jump back in" subtitle="Everything in its place" /><div className="quick-grid">{quickActions.map(({ label, detail, icon: Icon, to }) => <Link to={to} className="quick-card" key={label}><span className="quick-icon"><Icon size={22} /></span><span><strong>{label}</strong><small>{detail}</small></span><ArrowUpRight size={17} className="quick-arrow" /></Link>)}</div></section>
       <div className="home-footer"><Database size={15} /> Built for your local collection. Yours to keep.</div>
     </div>
   )

@@ -19,6 +19,14 @@ function optionalYear(searchParams) {
         : null;
 }
 
+function albumSort(searchParams) {
+    const sort = searchParams.get("sort") || "title";
+    if (!["title", "artist", "newest", "oldest"].includes(sort)) {
+        throw new HttpError(400, "invalid_parameter", "Invalid album sort order.");
+    }
+    return sort;
+}
+
 async function sendArtwork(req, res, albumId) {
     const artwork = music.getAlbumArtwork(albumId);
 
@@ -78,8 +86,14 @@ async function routeMusic(req, res, url) {
             artistId: optionalId(params, "artist_id"),
             year: optionalYear(params),
             genre: textFilter(params, "genre"),
+            sort: albumSort(params),
         }, page);
         sendList(req, res, result, page);
+        return true;
+    }
+
+    if (pathname === "/api/v1/music/albums/facets") {
+        sendJson(req, res, 200, { data: music.albumFacets() });
         return true;
     }
 

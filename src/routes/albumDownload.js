@@ -4,6 +4,7 @@ const path = require("node:path");
 const { HttpError } = require("../http");
 const music = require("../services/music");
 const { attachmentHeader } = require("./downloads");
+const { resolveArchiveFile } = require("../archivePaths");
 
 function safeSegment(value) {
     return value.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
@@ -38,12 +39,18 @@ async function sendAlbumDownload(req, res, albumId) {
         throw new HttpError(404, "album_files_unavailable", "No indexed files were found for this album.");
     }
 
+    const archiveFiles = [];
     for (const file of files) {
+        const filePath = resolveArchiveFile(file);
+        if (!filePath) {
+            throw new HttpError(409, "album_incomplete", "An indexed album file is unavailable.");
+        }
         try {
-            const stats = await fs.promises.stat(file.path);
+            const stats = await fs.promises.stat(filePath);
             if (!stats.isFile()) {
                 throw new HttpError(409, "album_incomplete", "An indexed album file is unavailable.");
             }
+            archiveFiles.push({ ...file, filePath });
         } catch (error) {
             if (error instanceof HttpError) throw error;
             if (error.code === "ENOENT" || error.code === "ENOTDIR") {
@@ -83,11 +90,11 @@ async function sendAlbumDownload(req, res, albumId) {
     });
     archive.pipe(res);
 
-    for (const file of files) {
+    for (const file of archiveFiles) {
         const relativePath = file.relative_path.replace(/\\/g, "/");
         const insideAlbum = relativePath.slice(prefix.length);
         const entryName = folder + "/" + uniqueEntryName(insideAlbum, usedNames);
-        archive.file(file.path, { name: entryName });
+        archive.file(file.filePath, { name: entryName });
     }
 
     archive.finalize().catch((error) => {

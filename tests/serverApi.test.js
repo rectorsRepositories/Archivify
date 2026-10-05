@@ -69,7 +69,8 @@ function startApi(dbPath) {
     return new Promise((resolve, reject) => {
         const child = spawn(process.execPath, ["-e", serverProgram], {
             cwd: projectRoot,
-            env: { ...process.env, ARCHIVE_DB: dbPath },
+            env: { ...process.env, ARCHIVE_DB: dbPath,
+                ARCHIVE_ROOT: path.join(path.dirname(dbPath), "archive") },
             stdio: ["ignore", "pipe", "pipe"],
         });
         let output = "";
@@ -199,6 +200,12 @@ describe("server API with indexed files and games", () => {
         ids.otherSong = addFile(fixture, "music", "Artist/Album Extra/02 - Next.mp3", "next!");
         ids.unicode = addFile(fixture, "music", "Artist/Album/Résumé mix.mp3", "bonjour");
         ids.cover = addFile(fixture, "games", "Wii/Star Fox.png", "cover");
+        // A still-existing path outside the configured archive must not be
+        // served, even when the indexed relative file exists locally.
+        const outsideCover = path.join(fixture.root, "outside-cover.png");
+        fs.writeFileSync(outsideCover, "external");
+        fixture.db.prepare("UPDATE files SET path = ? WHERE id = ?")
+            .run(outsideCover, ids.cover);
         ids.starFile = addFile(fixture, "games", "Wii/Star Fox.iso", "star-fox");
         ids.nebulaFile = addFile(fixture, "games", "PS2/Nebula.iso", "nebula");
         ids.alphaFile = addFile(fixture, "games", "Wii/Alpha.iso", "alpha");
@@ -410,6 +417,9 @@ describe("server API with indexed files and games", () => {
         }
         const local = await getJson(api.baseUrl, "/api/v1/games/" + ids.star);
         assert.equal(local.body.data.artwork_url, "/api/v1/files/" + ids.cover + "/content");
+        const cover = await fetch(api.baseUrl + local.body.data.artwork_url);
+        assert.equal(cover.status, 200);
+        assert.equal(await cover.text(), "cover");
         assert.equal(local.body.data.download_url, "/api/v1/files/" + ids.starFile + "/download");
         assert.equal(local.body.data.relative_path, "Wii/Star Fox.iso");
         const remote = await getJson(api.baseUrl, "/api/v1/games/" + ids.nebula);
@@ -420,5 +430,17 @@ describe("server API with indexed files and games", () => {
         const absent = await getJson(api.baseUrl, "/api/v1/games/999999");
         assert.equal(absent.response.status, 404);
         assert.equal(absent.body.error.code, "not_found");
+    });
+
+    it("returns game facets and server-side sort orders", async () => {
+        const facets = await getJson(api.baseUrl, "/api/v1/games/facets");
+        assert.deepEqual(facets.body.data, {
+            platforms: ["PlayStation 2", "Wii"], genres: ["Adventure", "Shooter"],
+        });
+        const newest = await getJson(api.baseUrl, "/api/v1/games?sort=newest&limit=2");
+        assert.deepEqual(newest.body.data.map((game) => game.id), [ids.nebula, ids.alpha]);
+        const oldest = await getJson(api.baseUrl, "/api/v1/games?sort=oldest&limit=2");
+        assert.deepEqual(oldest.body.data.map((game) => game.id), [ids.alpha, ids.star]);
+        assert.equal((await getJson(api.baseUrl, "/api/v1/games?sort=invalid")).response.status, 400);
     });
 });

@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const db = require("../db/database");
+const { archiveRoot: ARCHIVE_ROOT } = require("../archivePaths");
 
 // Ensure the database schema exists before indexing.
 require("../db/schema");
@@ -9,12 +10,6 @@ require("../db/schema");
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
-
-const ARCHIVE_ROOT = path.resolve(
-    process.env.ARCHIVE_ROOT || (process.platform === "win32"
-        ? path.join(__dirname, "../../archive")
-        : "/Archive")
-);
 
 /*
  * Keep these names matched to the actual capitalization

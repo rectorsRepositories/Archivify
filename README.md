@@ -36,10 +36,12 @@ Media in `archive/`, the SQLite database in `data/`, and `.env` are ignored by
 Git, so a clone does not contain them. Copy or mount your media separately. Set
 `ARCHIVE_ROOT` to the directory containing the `Music`, `Games`, `Pictures`, and
 `Videos` folders. Folder names must match that capitalization on case-sensitive
-file systems. If `ARCHIVE_ROOT` is unset, the indexer uses the repository's
-`archive/` directory on Windows and `/Archive` on other systems. The process must be able to read
-the media and write to the database directory. Create a fresh index on each
-machine because file records contain absolute paths.
+file systems. If `ARCHIVE_ROOT` is unset, the indexer and API use the test
+archive in the repository's `archive/` directory on Windows and the production
+archive at `/Archive` on other systems. The process must be able to read the
+media and write to the database directory. The API resolves indexed files from
+their category and relative path under the current archive root, so an index
+copied from another machine can still serve files in the same layout.
 
 ## Environment variables
 
@@ -67,7 +69,7 @@ and the commands it starts.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ARCHIVE_ROOT` | `archive/` on Windows; `/Archive` elsewhere | Media root scanned by `index:files`; contains `Music`, `Games`, `Pictures`, and `Videos`. |
+| `ARCHIVE_ROOT` | Repository `archive/` on Windows; `/Archive` elsewhere | Media root scanned by `index:files` and served by the API; contains `Music`, `Games`, `Pictures`, and `Videos`. |
 | `ARCHIVE_DB` | `data/archive.db` in the repository | SQLite index used by the API and all three indexers. Its parent directory is created if needed. |
 | `HOST` | `127.0.0.1` | Address where the API listens when started with `npm start` or by `npm run dev` / `npm run preview`. Use `0.0.0.0` only when the API itself should accept network connections. |
 | `PORT` | `3000` | API port, also used by the Vite `/api` proxy. Must be an integer from 1 to 65535. |

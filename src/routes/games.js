@@ -2,14 +2,24 @@ const { HttpError, sendJson, sendList, parseId, parseInteger, pagination, textFi
 const games = require("../services/games");
 
 function routeGames(req, res, url) {
+    if (url.pathname === "/api/v1/games/facets") {
+        sendJson(req, res, 200, { data: games.gameFacets() });
+        return true;
+    }
+
     if (url.pathname === "/api/v1/games") {
         const params = url.searchParams;
         const page = pagination(params);
+        const sort = params.get("sort") || "title";
+        if (!["title", "newest", "oldest"].includes(sort)) {
+            throw new HttpError(400, "invalid_parameter", "Invalid game sort order.");
+        }
         const result = games.listGames({
             q: textFilter(params, "q"),
             platform: textFilter(params, "platform"),
             genre: textFilter(params, "genre"),
             year: params.has("year") ? parseInteger(params.get("year"), "year", 1000, 9999) : null,
+            sort,
         }, page);
         sendList(req, res, result, page);
         return true;

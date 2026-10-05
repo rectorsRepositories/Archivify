@@ -86,7 +86,8 @@ function startApi(dbPath) {
     return new Promise((resolve, reject) => {
         const child = spawn(process.execPath, ["-e", serverProgram], {
             cwd: projectRoot,
-            env: { ...process.env, ARCHIVE_DB: dbPath },
+            env: { ...process.env, ARCHIVE_DB: dbPath,
+                ARCHIVE_ROOT: path.join(path.dirname(dbPath), "archive") },
             stdio: ["ignore", "pipe", "pipe"],
         });
         let stdout = "";

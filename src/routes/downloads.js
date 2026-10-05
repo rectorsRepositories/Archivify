@@ -3,6 +3,7 @@ const path = require("node:path");
 
 const { HttpError, parseId } = require("../http");
 const { getFile } = require("../services/files");
+const { resolveArchiveFile } = require("../archivePaths");
 
 const CONTENT_TYPES = {
     ".flac": "audio/flac",
@@ -85,10 +86,14 @@ function attachmentHeader(filename) {
 }
 
 async function sendIndexedFile(req, res, file, download = false) {
+    const filePath = resolveArchiveFile(file);
+    if (!filePath) {
+        throw new HttpError(404, "file_unavailable", "The indexed file is unavailable.");
+    }
     let stats;
 
     try {
-        stats = await fs.promises.stat(file.path);
+        stats = await fs.promises.stat(filePath);
     } catch (error) {
         if (error.code === "ENOENT" || error.code === "ENOTDIR") {
             throw new HttpError(404, "file_unavailable", "The indexed file is unavailable.");
@@ -140,7 +145,7 @@ async function sendIndexedFile(req, res, file, download = false) {
         return;
     }
 
-    const stream = fs.createReadStream(file.path, range || undefined);
+    const stream = fs.createReadStream(filePath, range || undefined);
     stream.on("error", (error) => {
         console.error(error);
         res.destroy(error);
