@@ -25,6 +25,31 @@ for (const value of (process.env.GAME_EXTRA_EXTENSIONS || "").split(/[\s,]+/).fi
 }
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
+/**
+ * @typedef {object} GameMetadata Optional fields from a neighboring .game.json file.
+ * @property {unknown} [title] Nonempty strings override the display title.
+ * @property {unknown} [platform] Nonempty strings override the platform and IGDB query.
+ * @property {unknown} [release_year] Values converting to a four-digit integer override the year.
+ * @property {unknown} [genre] Nonempty strings override the genre.
+ */
+
+/**
+ * @typedef {object} ParsedGame
+ * @property {number} fileId Indexed file ID.
+ * @property {string} sourceKey Slash-separated path relative to Games.
+ * @property {string} platform Platform inferred from the first directory.
+ * @property {string} title Title inferred from the filename.
+ * @property {string} stem Filename without extension.
+ * @property {string} directory Lowercase parent directory for artwork matching.
+ * @property {string} filePath Indexed absolute path for sidecar lookup.
+ */
+
+/**
+ * @typedef {object} GameIndexResult
+ * @property {number} indexed Game rows inserted or updated.
+ * @property {number} enriched Successful IGDB matches during this run.
+ */
+
 const getFiles = db.prepare(
     "SELECT id, path, relative_path, filename, extension FROM files " +
     "WHERE category = 'games' ORDER BY relative_path COLLATE NOCASE, id"
@@ -50,6 +75,11 @@ function cleanTitle(value) {
     return value.replace(/[\uF03A\uFF1A]/g, ":").replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Remove recognized ROM release tags while preserving meaningful title text.
+ * @param {string} stem Filename without extension.
+ * @returns {string} Normalized display title.
+ */
 function gameTitleFromStem(stem) {
     let title = stem;
     // ROM sets put release information at the end of the filename. Remove only
@@ -76,6 +106,11 @@ function text(value) {
     return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * Accept standalone game formats below a platform directory, excluding BIOS paths.
+ * @param {{id: number, path: string, relative_path: string, filename: string, extension: string|null}} file Indexed games-category file.
+ * @returns {ParsedGame|null} Parsed game or null for support and unrecognized files.
+ */
 function parseGameFile(file) {
     const extension = (file.extension || path.extname(file.filename)).toLowerCase();
     if (!GAME_EXTENSIONS.has(extension)) return null;
@@ -98,6 +133,11 @@ function parseGameFile(file) {
     };
 }
 
+/**
+ * Read optional neighboring metadata; missing, malformed, or unreadable files yield {}.
+ * @param {ParsedGame} game Parsed game and sidecar location.
+ * @returns {GameMetadata} Parsed overrides when the JSON root is an object.
+ */
 function sidecarMetadata(game) {
     const sidecarPath = path.join(path.dirname(game.filePath), game.stem + ".game.json");
     let metadata;
@@ -112,11 +152,23 @@ function sidecarMetadata(game) {
     return metadata;
 }
 
+/**
+ * Find the first indexed image with the game's stem in the same directory.
+ * @param {ParsedGame} game Game to match.
+ * @param {Map<string, Array<{id: number}>>} images Images keyed by lowercase directory and stem.
+ * @returns {number|null} Indexed artwork file ID, if present.
+ */
 function artworkId(game, images) {
     const candidates = images.get(game.directory + "/" + game.stem.toLowerCase());
     return candidates?.[0]?.id ?? null;
 }
 
+/**
+ * Upsert recognized games from indexed files, applying sidecar overrides first.
+ * Existing IGDB fields survive missing matches; lookups are retried for missing IDs
+ * or covers and when IGDB_REFRESH=1. Lookup failures are logged per game.
+ * @returns {Promise<GameIndexResult>} Counts of saved games and IGDB matches.
+ */
 async function runGameIndexer() {
     const files = getFiles.all();
     const images = new Map();

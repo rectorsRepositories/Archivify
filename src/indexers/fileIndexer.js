@@ -24,6 +24,17 @@ const ARCHIVE_DIRECTORIES = {
 
 const PRUNE = process.argv.includes("--prune");
 
+/**
+ * @typedef {object} FileIndexStats
+ * @property {number} scanned Regular files inspected after exclusions.
+ * @property {number} added Files inserted into the database.
+ * @property {number} updated Existing files with changed size or modification time.
+ * @property {number} unchanged Existing files with unchanged size and modification time.
+ * @property {number} removed Stale records deleted when pruning is enabled.
+ * @property {number} ignored Files skipped by name or extension.
+ * @property {number} errors File or directory operations that failed.
+ */
+
 // -----------------------------------------------------------------------------
 // Files we do not want indexed
 // -----------------------------------------------------------------------------
@@ -96,6 +107,7 @@ const deleteFileById = db.prepare(`
 // Statistics
 // -----------------------------------------------------------------------------
 
+/** @returns {FileIndexStats} Zeroed counters for one indexing run. */
 function createStats() {
     return {
         scanned: 0,
@@ -122,6 +134,11 @@ function getExtension(filename) {
     return extension || null;
 }
 
+/**
+ * Exclude OS metadata and incomplete downloads from all archive categories.
+ * @param {string} filePath Path whose basename and extension are checked.
+ * @returns {boolean} Whether the file is excluded.
+ */
 function shouldIgnore(filePath) {
     const filename = path.basename(filePath);
 
@@ -138,6 +155,15 @@ function shouldIgnore(filePath) {
 // Index a single file
 // -----------------------------------------------------------------------------
 
+/**
+ * Insert or refresh one file row; unchanged size and mtime leave it untouched.
+ * Errors are logged and counted instead of propagating.
+ * @param {string} filePath Path to the archive file.
+ * @param {string} category Archive category.
+ * @param {string} categoryRoot Root used for the stored relative path.
+ * @param {FileIndexStats} stats Counters updated in place.
+ * @returns {void}
+ */
 function indexFile(
     filePath,
     category,
@@ -267,6 +293,17 @@ function indexFile(
 // Recursively walk a directory
 // -----------------------------------------------------------------------------
 
+/**
+ * Scan regular files and file symlinks without following directory symlinks.
+ * A failed directory read marks the scan incomplete to prevent unsafe pruning.
+ * @param {string} directory Directory being scanned.
+ * @param {string} category Archive category.
+ * @param {string} categoryRoot Root used for relative paths.
+ * @param {Set<string>} seenPaths Paths encountered, including ignored files.
+ * @param {FileIndexStats} stats Counters updated in place.
+ * @param {{complete: boolean}} scanState Completion flag updated in place.
+ * @returns {void}
+ */
 function walkDirectory(
     directory,
     category,
@@ -403,6 +440,13 @@ function walkDirectory(
 // Remove stale database records
 // -----------------------------------------------------------------------------
 
+/**
+ * Delete category rows absent from a completed scan in one transaction.
+ * @param {string} category Archive category to prune.
+ * @param {Set<string>} seenPaths Paths found during the scan.
+ * @param {FileIndexStats} stats Removal counter updated in place.
+ * @returns {void}
+ */
 function pruneMissingFiles(
     category,
     seenPaths,
@@ -438,6 +482,14 @@ function pruneMissingFiles(
 // Scan one archive category
 // -----------------------------------------------------------------------------
 
+/**
+ * Scan one archive directory and optionally prune after a complete scan.
+ * Missing or unreadable roots increment errors without deleting records.
+ * @param {string} category Archive category.
+ * @param {string} directory Category root on disk.
+ * @param {FileIndexStats} stats Counters updated in place.
+ * @returns {void}
+ */
 function scanCategory(
     category,
     directory,
@@ -561,6 +613,10 @@ function scanCategory(
 // Main index operation
 // -----------------------------------------------------------------------------
 
+/**
+ * Index configured archive categories and report aggregate file counts.
+ * @returns {FileIndexStats} Counts for this run.
+ */
 function runIndexer() {
     const stats = createStats();
 

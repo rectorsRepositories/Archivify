@@ -26,11 +26,22 @@ const CONTENT_TYPES = {
     ".pdf": "application/pdf",
 };
 
+/**
+ * Choose a media type from the indexed extension or filename.
+ * @param {import('../services/files').IndexedFile} file Indexed file row.
+ * @returns {string} Known media type or application/octet-stream.
+ */
 function contentType(file) {
     const extension = (file.extension || path.extname(file.filename)).toLowerCase();
     return CONTENT_TYPES[extension] || "application/octet-stream";
 }
 
+/**
+ * Parse one HTTP byte range; unsupported units and multipart ranges are ignored.
+ * @param {string|undefined} header Range header.
+ * @param {number} size Current file size in bytes.
+ * @returns {{start: number, end: number}|null|false} Range, ignored header, or unsatisfiable range.
+ */
 function parseRange(header, size) {
     if (!header) {
         return null;
@@ -76,6 +87,11 @@ function parseRange(header, size) {
     return { start, end };
 }
 
+/**
+ * Build an attachment header with ASCII fallback and UTF-8 filename.
+ * @param {string} filename Download name.
+ * @returns {string} Content-Disposition value.
+ */
 function attachmentHeader(filename) {
     const fallback = filename.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
     const encoded = encodeURIComponent(filename).replace(/['()*]/g, (character) =>
@@ -85,6 +101,17 @@ function attachmentHeader(filename) {
     return "attachment; filename=\"" + fallback + "\"; filename*=UTF-8''" + encoded;
 }
 
+/**
+ * Serve an indexed file with GET/HEAD and single byte-range support.
+ * Uses the current archive path and reports missing files as 404; stream errors
+ * after headers are sent destroy the response.
+ * @param {import('node:http').IncomingMessage} req Request.
+ * @param {import('node:http').ServerResponse} res Response.
+ * @param {import('../services/files').IndexedFile} file Indexed file row.
+ * @param {boolean} [download=false] Send as an attachment when true.
+ * @returns {Promise<void>} Resolves after response setup, not stream completion.
+ * @throws {HttpError} When the indexed file cannot be resolved or found.
+ */
 async function sendIndexedFile(req, res, file, download = false) {
     const filePath = resolveArchiveFile(file);
     if (!filePath) {
@@ -153,6 +180,14 @@ async function sendIndexedFile(req, res, file, download = false) {
     stream.pipe(res);
 }
 
+/**
+ * Handle file content and attachment download routes.
+ * @param {import('node:http').IncomingMessage} req Request.
+ * @param {import('node:http').ServerResponse} res Response.
+ * @param {URL} url Parsed request URL.
+ * @returns {Promise<boolean>} Whether this route handled the path.
+ * @throws {HttpError} When an indexed file is absent or unavailable.
+ */
 async function routeDownloads(req, res, url) {
     const match = /^\/api\/v1\/files\/(\d+)\/(content|download)$/.exec(url.pathname);
 

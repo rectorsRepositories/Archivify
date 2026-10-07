@@ -8,6 +8,11 @@ const SEARCH_TABLES = [
     { table: "tracks", columns: ["title"] },
 ];
 
+/**
+ * Create trigram FTS tables and synchronization triggers in one transaction.
+ * Newly created indexes are rebuilt from existing rows only once.
+ * @returns {void}
+ */
 function initializeSearchIndexes() {
     // Keep creation, triggers, and backfill atomic. A startup interrupted
     // during migration must not leave an empty index marked as initialized.

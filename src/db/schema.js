@@ -5,6 +5,11 @@ const { initializeSearchIndexes } = require("./searchIndex");
 // Database schema
 // -----------------------------------------------------------------------------
 
+/**
+ * Create archive tables and indexes, then initialize the search indexes.
+ * Called when this module loads; existing tables and indexes are retained.
+ * @returns {void}
+ */
 function initializeSchema() {
     db.exec(`
         -- ---------------------------------------------------------------------

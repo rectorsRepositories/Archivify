@@ -6,11 +6,22 @@ const music = require("../services/music");
 const { attachmentHeader } = require("./downloads");
 const { resolveArchiveFile } = require("../archivePaths");
 
+/**
+ * Replace unsafe archive-entry characters and trailing dots/spaces.
+ * @param {string} value One path segment.
+ * @returns {string} Safe segment, or untitled when empty.
+ */
 function safeSegment(value) {
     return value.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
         .replace(/[. ]+$/g, "").trim() || "untitled";
 }
 
+/**
+ * Reserve a case-insensitively unique ZIP entry name.
+ * @param {string} relativePath Path within the album.
+ * @param {Set<string>} usedNames Lowercase names already reserved; updated in place.
+ * @returns {string} Sanitized, unique entry path.
+ */
 function uniqueEntryName(relativePath, usedNames) {
     const parts = relativePath.split("/").map(safeSegment);
     const filename = parts.pop();
@@ -28,6 +39,16 @@ function uniqueEntryName(relativePath, usedNames) {
     return candidate;
 }
 
+/**
+ * Validate every indexed album file, then stream a stored ZIP including artwork.
+ * Duplicate relative paths are removed by the query; streaming errors destroy
+ * the response after headers have been sent.
+ * @param {import('node:http').IncomingMessage} req Request.
+ * @param {import('node:http').ServerResponse} res Response.
+ * @param {number} albumId Album ID.
+ * @returns {Promise<void>} Resolves after ZIP streaming starts, not completion.
+ * @throws {HttpError} For a missing album, no indexed files, or unavailable files.
+ */
 async function sendAlbumDownload(req, res, albumId) {
     const album = music.getAlbum(albumId);
     if (!album) {

@@ -22,6 +22,68 @@ const ARTIST_COLUMNS =
     "(SELECT COUNT(*) FROM album_artists aa WHERE aa.artist_id = ar.id) AS album_count, " +
     "(SELECT COUNT(*) FROM track_artists ta WHERE ta.artist_id = ar.id) AS track_count";
 
+/** @typedef {{id: number, name: string}} ArtistRef */
+
+/**
+ * @typedef {object} PublicAlbum
+ * @property {number} id Album ID.
+ * @property {string} source_key Album directory below Music.
+ * @property {string} title Album title.
+ * @property {number|null} release_year Release year.
+ * @property {string|null} genre Genre.
+ * @property {ArtistRef[]} artists Album artists.
+ * @property {number} track_count Number of tracks.
+ * @property {number|null} duration_ms Sum of durations, or null when any is missing.
+ * @property {number} size_bytes Sum of track file sizes.
+ * @property {string|null} artwork_url Artwork endpoint when available.
+ * @property {string} tracks_url Track listing endpoint.
+ * @property {string} download_url Album ZIP endpoint.
+ */
+
+/**
+ * @typedef {object} PublicTrack
+ * @property {number} id Track ID.
+ * @property {number} file_id Indexed audio file ID.
+ * @property {number|null} album_id Album ID, when linked.
+ * @property {string|null} album_title Album title, when linked.
+ * @property {string} title Track title.
+ * @property {number|null} track_number Track number.
+ * @property {number|null} disc_number Disc number.
+ * @property {number|null} duration_ms Duration in milliseconds.
+ * @property {number|null} release_year Release year.
+ * @property {string|null} genre Genre.
+ * @property {ArtistRef[]} artists Track artists.
+ * @property {number} size_bytes File size in bytes.
+ * @property {string|null} extension File extension.
+ * @property {string} relative_path Slash-separated path below Music.
+ * @property {string} content_url Content endpoint.
+ * @property {string} download_url Attachment endpoint.
+ */
+
+/**
+ * @typedef {object} PublicArtist
+ * @property {number} id Artist ID.
+ * @property {string} name Artist name.
+ * @property {number} album_count Linked albums.
+ * @property {number} track_count Linked tracks.
+ * @property {string} albums_url Filtered album endpoint.
+ */
+
+/**
+ * @typedef {object} MusicFilters
+ * @property {string|null} [q] Title or artist substring.
+ * @property {number|null} [artistId] Artist ID.
+ * @property {number|null} [albumId] Album ID for track queries.
+ * @property {number|null} [year] Release year.
+ * @property {string|null} [genre] Case-insensitive genre.
+ * @property {'title'|'artist'|'newest'|'oldest'} [sort] Album sort order.
+ */
+
+/**
+ * Load artists for album IDs in one query, including empty arrays for unmatched IDs.
+ * @param {number[]} ids Album IDs.
+ * @returns {Map<number, ArtistRef[]>} Artists keyed by album ID.
+ */
 function artistsByAlbum(ids) {
     const result = new Map(ids.map((id) => [id, []]));
 
@@ -44,6 +106,11 @@ function artistsByAlbum(ids) {
     return result;
 }
 
+/**
+ * Load artists for track IDs in one query, including empty arrays for unmatched IDs.
+ * @param {number[]} ids Track IDs.
+ * @returns {Map<number, ArtistRef[]>} Artists keyed by track ID.
+ */
 function artistsByTrack(ids) {
     const result = new Map(ids.map((id) => [id, []]));
 
@@ -66,6 +133,11 @@ function artistsByTrack(ids) {
     return result;
 }
 
+/**
+ * Add artist lists, aggregate fields, and URLs to album rows.
+ * @param {object[]} rows Album query rows.
+ * @returns {PublicAlbum[]} Public albums in input order.
+ */
 function publicAlbums(rows) {
     const artists = artistsByAlbum(rows.map((row) => row.id));
 
@@ -87,6 +159,11 @@ function publicAlbums(rows) {
     }));
 }
 
+/**
+ * Add artist lists and content URLs to joined track rows.
+ * @param {object[]} rows Joined track, file, and album rows.
+ * @returns {PublicTrack[]} Public tracks in input order.
+ */
 function publicTracks(rows) {
     const artists = artistsByTrack(rows.map((row) => row.id));
 
@@ -110,6 +187,13 @@ function publicTracks(rows) {
     }));
 }
 
+/**
+ * Query albums by title/artist text and optional artist, year, or genre.
+ * Duration is null when any track lacks a duration.
+ * @param {MusicFilters} filters Album search and sort options.
+ * @param {{limit: number, offset: number}} page Validated pagination.
+ * @returns {{items: PublicAlbum[], total: number}} Public albums and pre-pagination count.
+ */
 function listAlbums(filters, page) {
     const conditions = [];
     const values = [];
@@ -171,6 +255,7 @@ function listAlbums(filters, page) {
     return { items: publicAlbums(rows), total };
 }
 
+/** @returns {{genres: string[], years: number[]}} Available album filters. */
 function albumFacets() {
     return {
         genres: db.prepare("SELECT DISTINCT genre FROM albums WHERE genre IS NOT NULL " +
@@ -182,6 +267,11 @@ function albumFacets() {
     };
 }
 
+/**
+ * Fetch one public album by ID.
+ * @param {number} id Album ID.
+ * @returns {PublicAlbum|null} Album data, if present.
+ */
 function getAlbum(id) {
     const row = db.prepare(
         "SELECT " + ALBUM_COLUMNS + " FROM albums a WHERE a.id = ?"
@@ -189,6 +279,12 @@ function getAlbum(id) {
     return row ? publicAlbums([row])[0] : null;
 }
 
+/**
+ * Query artists linked to at least one album or track.
+ * @param {MusicFilters} filters Optional name substring.
+ * @param {{limit: number, offset: number}} page Validated pagination.
+ * @returns {{items: PublicArtist[], total: number}} Public artists and pre-pagination count.
+ */
 function listArtists(filters, page) {
     const conditions = [
         "(EXISTS (SELECT 1 FROM album_artists aa WHERE aa.artist_id = ar.id) " +
@@ -218,6 +314,11 @@ function listArtists(filters, page) {
     return { items: rows.map(publicArtist), total };
 }
 
+/**
+ * Add a linked album-list URL to an artist row.
+ * @param {object} row Artist query row with album and track counts.
+ * @returns {PublicArtist} Public artist data.
+ */
 function publicArtist(row) {
     return {
         id: row.id,
@@ -228,6 +329,11 @@ function publicArtist(row) {
     };
 }
 
+/**
+ * Fetch one public artist by ID.
+ * @param {number} id Artist ID.
+ * @returns {PublicArtist|null} Artist data, if present.
+ */
 function getArtist(id) {
     const row = db.prepare(
         "SELECT " + ARTIST_COLUMNS + " FROM artists ar WHERE ar.id = ?"
@@ -235,6 +341,12 @@ function getArtist(id) {
     return row ? publicArtist(row) : null;
 }
 
+/**
+ * Query tracks by title/artist text and optional album, artist, year, or genre.
+ * @param {MusicFilters} filters Track search options.
+ * @param {{limit: number, offset: number}} page Validated pagination.
+ * @returns {{items: PublicTrack[], total: number}} Public tracks and pre-pagination count.
+ */
 function listTracks(filters, page) {
     const conditions = [];
     const values = [];
@@ -296,6 +408,11 @@ function listTracks(filters, page) {
     return { items: publicTracks(rows), total };
 }
 
+/**
+ * Fetch one public track by ID.
+ * @param {number} id Track ID.
+ * @returns {PublicTrack|null} Track data, if present.
+ */
 function getTrack(id) {
     const row = db.prepare(
         "SELECT " + TRACK_COLUMNS +
@@ -305,6 +422,11 @@ function getTrack(id) {
     return row ? publicTracks([row])[0] : null;
 }
 
+/**
+ * Fetch an album's indexed artwork ID and optional embedded image bytes.
+ * @param {number} id Album ID.
+ * @returns {{artwork_file_id: number|null, mime_type: string|null, image_data: Buffer|null}|undefined} Artwork row, if the album exists.
+ */
 function getAlbumArtwork(id) {
     return db.prepare(
         "SELECT a.artwork_file_id, aa.mime_type, aa.image_data " +
@@ -313,6 +435,12 @@ function getAlbumArtwork(id) {
     ).get(id);
 }
 
+/**
+ * List indexed files beneath an album directory, deduplicating relative paths.
+ * Includes artwork and other non-audio files for ZIP downloads.
+ * @param {string} sourceKey Album directory relative to Music.
+ * @returns {Array<{path: string, category: string, relative_path: string, filename: string}>} File rows in path order.
+ */
 function listAlbumFiles(sourceKey) {
     const rows = db.prepare(
         "SELECT path, category, relative_path, filename FROM files " +

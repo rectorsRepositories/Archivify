@@ -1,6 +1,14 @@
 const { HttpError, sendJson, sendList, parseId, parseInteger, pagination, textFilter } = require("../http");
 const games = require("../services/games");
 
+/**
+ * Serve game listings, facets, and details.
+ * @param {import('node:http').IncomingMessage} req Request.
+ * @param {import('node:http').ServerResponse} res Response.
+ * @param {URL} url Parsed request URL.
+ * @returns {boolean} Whether this route handled the path.
+ * @throws {HttpError} For invalid filters or a missing game ID.
+ */
 function routeGames(req, res, url) {
     if (url.pathname === "/api/v1/games/facets") {
         sendJson(req, res, 200, { data: games.gameFacets() });

@@ -8,6 +8,39 @@ const GAME_COLUMNS =
     "g.summary, g.igdb_url";
 const GAME_FROM = " FROM games g JOIN files f ON f.id = g.file_id";
 
+/**
+ * @typedef {object} PublicGame
+ * @property {number} id Game ID.
+ * @property {string} title Display title.
+ * @property {string} platform Platform name.
+ * @property {number|null} release_year Release year.
+ * @property {string|null} genre Genre.
+ * @property {number} file_id Indexed game file ID.
+ * @property {string} filename Game filename.
+ * @property {string|null} extension Game file extension.
+ * @property {number} size_bytes File size in bytes.
+ * @property {string} relative_path Slash-separated path below Games.
+ * @property {string|null} summary IGDB summary.
+ * @property {number|null} igdb_id IGDB game ID.
+ * @property {string|null} igdb_url IGDB page URL.
+ * @property {string|null} artwork_url Local cover or IGDB cover URL.
+ * @property {string} download_url Game file download URL.
+ */
+
+/**
+ * @typedef {object} GameFilters
+ * @property {string|null} [q] Title or platform substring.
+ * @property {string|null} [platform] Case-insensitive platform match.
+ * @property {string|null} [genre] Case-insensitive genre match.
+ * @property {number|null} [year] Release year.
+ * @property {'title'|'newest'|'oldest'} [sort] Validated sort order.
+ */
+
+/**
+ * Format a joined game row, preferring local artwork over an IGDB cover URL.
+ * @param {object} row Joined games/files query row.
+ * @returns {PublicGame} Public game data and download/artwork URLs.
+ */
 function publicGame(row) {
     return {
         id: row.id,
@@ -33,6 +66,12 @@ function publicGame(row) {
     };
 }
 
+/**
+ * Query games with validated filters and sorting.
+ * @param {GameFilters} filters Game search and sort options.
+ * @param {{limit: number, offset: number}} page Validated pagination.
+ * @returns {{items: PublicGame[], total: number}} Public games and pre-pagination count.
+ */
 function listGames(filters, page) {
     const conditions = [];
     const values = [];
@@ -71,6 +110,7 @@ function listGames(filters, page) {
     return { items: rows.map(publicGame), total };
 }
 
+/** @returns {{platforms: string[], genres: string[]}} Available game filters. */
 function gameFacets() {
     return {
         platforms: db.prepare("SELECT DISTINCT platform FROM games ORDER BY platform COLLATE NOCASE")
@@ -81,6 +121,11 @@ function gameFacets() {
     };
 }
 
+/**
+ * Fetch one public game by ID.
+ * @param {number} id Game ID.
+ * @returns {PublicGame|null} Game data, if present.
+ */
 function getGame(id) {
     const row = db.prepare("SELECT " + GAME_COLUMNS + GAME_FROM + " WHERE g.id = ?").get(id);
     return row ? publicGame(row) : null;

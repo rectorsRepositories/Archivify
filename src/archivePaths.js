@@ -11,6 +11,13 @@ const categoryFolders = {
     videos: "Videos",
 };
 
+/**
+ * Resolve an indexed file within the current archive root.
+ * Uses an in-root indexed path when available, otherwise the category and
+ * relative path, so databases copied from another machine remain usable.
+ * @param {{category: string, relative_path: string, path?: string}} file Indexed file location.
+ * @returns {string|null} Safe absolute path or null for invalid locations.
+ */
 function resolveArchiveFile(file) {
     const folder = categoryFolders[file.category];
     const parts = file.relative_path?.split(/[\\/]+/);

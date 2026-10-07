@@ -10,6 +10,10 @@ const { routeFiles } = require("./routes/files");
 const { routeDownloads } = require("./routes/downloads");
 const healthQuery = db.prepare("SELECT 1");
 
+/**
+ * Create the API server, dispatching GET/HEAD routes and formatting errors.
+ * @returns {import('node:http').Server} Server ready to listen.
+ */
 function createServer() {
     return http.createServer(async (req, res) => {
         try {
@@ -49,6 +53,11 @@ function createServer() {
     });
 }
 
+/**
+ * Listen on HOST/PORT (default 127.0.0.1:3000).
+ * @returns {import('node:http').Server} Server on which listening has been requested.
+ * @throws {HttpError} When PORT is invalid.
+ */
 function startServer() {
     const port = parseInteger(process.env.PORT || "3000", "PORT", 1, 65535);
     const host = process.env.HOST || "127.0.0.1";

@@ -1,3 +1,8 @@
+/**
+ * Shared SQLite connection. Importing this module creates the database directory
+ * and file as needed, then enables WAL, foreign keys, and a five-second lock wait.
+ * @module database
+ */
 const fs = require("node:fs");
 const path = require("node:path");
 const Database = require("better-sqlite3");

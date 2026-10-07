@@ -13,6 +13,14 @@ const {
     librarySummary,
 } = require("../services/files");
 
+/**
+ * Serve file listings, file details, and the library summary.
+ * @param {import('node:http').IncomingMessage} req Request.
+ * @param {import('node:http').ServerResponse} res Response.
+ * @param {URL} url Parsed request URL.
+ * @returns {boolean} Whether this route handled the path.
+ * @throws {HttpError} For invalid filters or a missing file ID.
+ */
 function routeFiles(req, res, url) {
     if (url.pathname === "/api/v1/library/summary") {
         sendJson(req, res, 200, { data: librarySummary() });

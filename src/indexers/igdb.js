@@ -8,11 +8,31 @@ const PLATFORM_NAMES = {
     pc: "pc microsoft windows",
 };
 
+/**
+ * @typedef {object} IgdbGame
+ * @property {number} id IGDB game ID.
+ * @property {string} name Primary title.
+ * @property {Array<{name: string}>} [alternative_names] Alternate titles.
+ * @property {Array<{name: string}>} [platforms] Supported platforms.
+ * @property {Array<{name: string}>} [genres] Genres.
+ * @property {{image_id: string}} [cover] Cover image reference.
+ * @property {number} [first_release_date] Unix timestamp in seconds.
+ * @property {string} [summary] Game summary.
+ * @property {string} [url] IGDB page URL.
+ */
+
 function normalized(value) {
     return String(value || "").normalize("NFKD").toLowerCase()
         .replace(/[^a-z0-9]+/g, " ").replace(/\bversus\b/g, "vs").trim();
 }
 
+/**
+ * Require normalized exact title and platform matches, including alternate titles.
+ * @param {IgdbGame[]} results IGDB search candidates.
+ * @param {string} title Requested title.
+ * @param {string} platform Requested platform name or supported abbreviation.
+ * @returns {IgdbGame|null} First matching candidate, if any.
+ */
 function matchGame(results, title, platform) {
     const wantedTitle = normalized(title);
     const wantedPlatform = PLATFORM_NAMES[normalized(platform).replace(/ /g, "")] || normalized(platform);
@@ -27,6 +47,14 @@ function sleep(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+/**
+ * Authenticate with Twitch and create a rate-limited IGDB lookup client.
+ * Searches retry once after HTTP 429; other request failures propagate.
+ * @param {string} clientId Twitch client ID.
+ * @param {string} clientSecret Twitch client secret.
+ * @returns {Promise<{lookup(title: string, platform: string): Promise<IgdbGame|null>}>} Search client.
+ * @throws {Error} When token acquisition fails or has no access token.
+ */
 async function createIgdbClient(clientId, clientSecret) {
     const tokenResponse = await fetch("https://id.twitch.tv/oauth2/token", {
         method: "POST",
@@ -43,6 +71,13 @@ async function createIgdbClient(clientId, clientSecret) {
     if (!token) throw new Error("Twitch token response did not include an access token");
 
     let lastRequest = 0;
+    /**
+     * Search IGDB for an exact normalized title and platform match.
+     * @param {string} title Game title; query delimiters are removed.
+     * @param {string} platform Platform name or supported abbreviation.
+     * @returns {Promise<IgdbGame|null>} Matching game, if any.
+     * @throws {Error} When the search request fails after the allowed retry.
+     */
     async function lookup(title, platform) {
         const elapsed = Date.now() - lastRequest;
         if (elapsed < 300) await sleep(300 - elapsed);

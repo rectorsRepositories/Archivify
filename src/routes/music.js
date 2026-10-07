@@ -13,12 +13,24 @@ const { getFile } = require("../services/files");
 const { sendIndexedFile } = require("./downloads");
 const { sendAlbumDownload } = require("./albumDownload");
 
+/**
+ * Read an optional four-digit release year.
+ * @param {URLSearchParams} searchParams Request query parameters.
+ * @returns {number|null} Year or null when absent.
+ * @throws {HttpError} For an invalid year.
+ */
 function optionalYear(searchParams) {
     return searchParams.has("year")
         ? parseInteger(searchParams.get("year"), "year", 1000, 9999)
         : null;
 }
 
+/**
+ * Read a validated album sort order.
+ * @param {URLSearchParams} searchParams Request query parameters.
+ * @returns {'title'|'artist'|'newest'|'oldest'} Sort order.
+ * @throws {HttpError} For an unsupported order.
+ */
 function albumSort(searchParams) {
     const sort = searchParams.get("sort") || "title";
     if (!["title", "artist", "newest", "oldest"].includes(sort)) {
@@ -27,6 +39,14 @@ function albumSort(searchParams) {
     return sort;
 }
 
+/**
+ * Serve indexed album cover art when its file row exists; otherwise use embedded art.
+ * @param {import('node:http').IncomingMessage} req Request.
+ * @param {import('node:http').ServerResponse} res Response.
+ * @param {number} albumId Album ID.
+ * @returns {Promise<void>} Resolves after headers and body are sent or streaming begins.
+ * @throws {HttpError} When the album or its artwork is unavailable.
+ */
 async function sendArtwork(req, res, albumId) {
     const artwork = music.getAlbumArtwork(albumId);
 
@@ -55,6 +75,14 @@ async function sendArtwork(req, res, albumId) {
     res.end(req.method === "HEAD" ? undefined : artwork.image_data);
 }
 
+/**
+ * Serve artist, album, track, artwork, and album-download endpoints.
+ * @param {import('node:http').IncomingMessage} req Request.
+ * @param {import('node:http').ServerResponse} res Response.
+ * @param {URL} url Parsed request URL.
+ * @returns {Promise<boolean>} Whether this route handled the path.
+ * @throws {HttpError} For invalid filters or unavailable resources.
+ */
 async function routeMusic(req, res, url) {
     const pathname = url.pathname;
     const params = url.searchParams;

@@ -28,6 +28,61 @@ const COVER_NAMES = new Map([
 
 const MAX_EMBEDDED_ART_BYTES = 10 * 1024 * 1024;
 
+/**
+ * @typedef {object} IndexedMusicFile
+ * @property {number} id File table ID.
+ * @property {string} path Absolute path used to read tags.
+ * @property {string} relative_path Path below Music.
+ * @property {string} filename Basename.
+ * @property {string|null} extension Indexed extension.
+ */
+
+/**
+ * @typedef {object} ParsedMusicFile
+ * @property {string} albumKey Slash-separated album directory relative to Music.
+ * @property {string} folderArtist Artist inferred from the directory.
+ * @property {string} folderAlbum Album inferred from the directory.
+ * @property {number} fileId File table ID.
+ * @property {string} filePath Absolute path.
+ * @property {string} relativePath Path below Music.
+ * @property {string} title Filename-derived title.
+ * @property {number|null} trackNumber Filename-derived track number.
+ * @property {number|null} discNumber Directory- or filename-derived disc number.
+ */
+
+/**
+ * @typedef {object} AlbumGroup
+ * @property {string} key Album source key.
+ * @property {string} folderArtist Directory-derived artist.
+ * @property {string} folderAlbum Directory-derived album title.
+ * @property {ParsedMusicFile[]} tracks Audio files in the album.
+ * @property {number|null} coverFileId Preferred indexed cover image ID.
+ */
+
+/**
+ * @typedef {object} AlbumDetails
+ * @property {string} title Tag-derived or directory-derived album title.
+ * @property {string[]} artists Tag-derived or directory-derived album artists.
+ * @property {number|null} releaseYear Album release year.
+ * @property {string|null} genre Album genre.
+ * @property {{mimeType: string, imageData: Buffer}|null} artwork Embedded cover when no indexed cover is selected.
+ * @property {Array<{fileId: number, title: string, trackNumber: number|null, discNumber: number|null, durationMs: number|null, releaseYear: number|null, genre: string|null, artists: string[]}>} tracks Parsed tracks.
+ */
+
+/**
+ * @typedef {object} MusicIndexStats
+ * @property {number} audioFiles Recognized audio files found.
+ * @property {number} skipped Audio files outside the expected directory layout.
+ * @property {number} metadataErrors Tag reads that failed.
+ * @property {number} missingDurations Tracks without a parsed duration.
+ * @property {number} albumsIndexed Albums saved this run.
+ * @property {number} albumsCreated Newly inserted albums.
+ * @property {number} albumsRemoved Orphaned albums deleted.
+ * @property {number} tracksIndexed Tracks saved this run.
+ * @property {number} tracksCreated Newly inserted tracks.
+ * @property {number} artistsRemoved Orphaned artists deleted.
+ */
+
 const getMusicFiles = db.prepare(
     "SELECT id, path, relative_path, filename, extension FROM files " +
     "WHERE category = 'music' ORDER BY relative_path COLLATE NOCASE, id"
@@ -96,6 +151,10 @@ const linkTrackArtist = db.prepare(
     "INSERT INTO track_artists (track_id, artist_id) VALUES (?, ?)"
 );
 
+/**
+ * Delete albums without tracks and artists without album or track links.
+ * @returns {{albumsRemoved: number, artistsRemoved: number}} Deleted row counts.
+ */
 const reconcileOrphans = db.transaction(() => {
     const albumsRemoved = db.prepare(
         "DELETE FROM albums WHERE NOT EXISTS " +
@@ -118,6 +177,12 @@ function tagText(value) {
     return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
 }
 
+/**
+ * Deduplicate plural artist tags case-insensitively, falling back to a singular tag.
+ * @param {unknown} plural Multi-value artist tag.
+ * @param {unknown} singular Single artist tag.
+ * @returns {string[]} Nonempty normalized artist names.
+ */
 function tagNames(plural, singular) {
     const names = [];
     const seen = new Set();
@@ -148,6 +213,11 @@ function positiveInteger(value) {
     return Number.isInteger(number) && number > 0 ? number : null;
 }
 
+/**
+ * Prefer a valid year tag, then the leading year in release-date or date tags.
+ * @param {object} common Parsed common music tags.
+ * @returns {number|null} Release year, if found.
+ */
 function releaseYear(common) {
     const taggedYear = positiveInteger(common.year);
 
@@ -166,11 +236,21 @@ function releaseYear(common) {
     return null;
 }
 
+/**
+ * Select the first nonempty genre tag.
+ * @param {object} common Parsed common music tags.
+ * @returns {string|null} Primary genre, if present.
+ */
 function primaryGenre(common) {
     const genres = Array.isArray(common.genre) ? common.genre : [common.genre];
     return genres.map(tagText).find(Boolean) || null;
 }
 
+/**
+ * Find a CD, disc, or disk number in track subdirectories.
+ * @param {string[]} directories Folders below the album directory.
+ * @returns {number|null} First recognized disc number.
+ */
 function discNumberFromDirectories(directories) {
     for (const directory of directories) {
         const match = /^(?:cd|disc|disk)[\s._-]*(\d{1,2})$/i.exec(directory);
@@ -183,6 +263,12 @@ function discNumberFromDirectories(directories) {
     return null;
 }
 
+/**
+ * Infer title and track/disc numbers from common filename prefixes.
+ * @param {string} filename Audio filename.
+ * @param {number|null} directoryDiscNumber Disc number inferred from parent folders.
+ * @returns {{title: string, trackNumber: number|null, discNumber: number|null}} Filename fallback metadata.
+ */
 function trackDetails(filename, directoryDiscNumber) {
     const stem = path.parse(filename).name;
     let title = stem;
@@ -205,6 +291,11 @@ function trackDetails(filename, directoryDiscNumber) {
     return { title: displayName(title), trackNumber, discNumber };
 }
 
+/**
+ * Parse artist/album/track folders, optionally preceded by a format directory.
+ * @param {IndexedMusicFile} file Indexed Music file.
+ * @returns {ParsedMusicFile|null} Parsed path or null for an unexpected layout.
+ */
 function parseMusicFile(file) {
     // fileIndexer stores native separators, so accept both Windows and POSIX paths.
     const parts = file.relative_path.split(/[\\/]+/).filter(Boolean);
@@ -235,6 +326,12 @@ function parseMusicFile(file) {
     };
 }
 
+/**
+ * Rank named album covers, preferring cover/folder/front/album and shallower paths.
+ * @param {IndexedMusicFile} file Indexed image.
+ * @param {string} albumKey Album directory key.
+ * @returns {number|null} Lower is better; null means the name is not recognized.
+ */
 function coverScore(file, albumKey) {
     const name = path.parse(file.filename).name.toLowerCase();
     const priority = COVER_NAMES.get(name);
@@ -249,6 +346,10 @@ function coverScore(file, albumKey) {
     return priority * 100 + Math.max(0, directoryDepth);
 }
 
+/**
+ * Group indexed audio files by album and select one indexed cover per group.
+ * @returns {{groups: Map<string, AlbumGroup>, audioFiles: number, skipped: number}} Album groups and scan counts.
+ */
 function collectAlbums() {
     const groups = new Map();
     const covers = new Map();
@@ -306,6 +407,11 @@ function collectAlbums() {
     return { groups, audioFiles, skipped };
 }
 
+/**
+ * Accept supported picture MIME types and common abbreviated formats.
+ * @param {unknown} format Picture format tag.
+ * @returns {string|null} MIME type, if supported.
+ */
 function pictureMimeType(format) {
     const value = tagText(format).toLowerCase();
 
@@ -321,6 +427,12 @@ function pictureMimeType(format) {
     }[value] || null;
 }
 
+/**
+ * Accept supported embedded art up to 10 MiB when no indexed cover is selected.
+ * @param {object} common Parsed common music tags.
+ * @param {Function} selectCover Metadata library cover selector.
+ * @returns {{mimeType: string, imageData: Buffer}|null} Storable picture, if present.
+ */
 function embeddedPicture(common, selectCover) {
     const picture = selectCover(common.picture);
     const mimeType = pictureMimeType(picture?.format);
@@ -336,6 +448,15 @@ function embeddedPicture(common, selectCover) {
     };
 }
 
+/**
+ * Read each track's tags, falling back to folder and filename data on missing tags.
+ * Tag failures increment stats and do not abort the album.
+ * @param {AlbumGroup} group Files and cover selected for one album.
+ * @param {Function} parseFile Metadata library file parser.
+ * @param {Function} selectCover Metadata library cover selector.
+ * @param {MusicIndexStats} stats Counters updated in place.
+ * @returns {Promise<AlbumDetails>} Album and track metadata ready for persistence.
+ */
 async function readAlbum(group, parseFile, selectCover, stats) {
     const tracks = [];
     let taggedAlbumTitle = "";
@@ -404,11 +525,24 @@ async function readAlbum(group, parseFile, selectCover, stats) {
     };
 }
 
+/**
+ * Insert an artist if needed and return its database ID.
+ * @param {string} name Artist name.
+ * @returns {number} Artist ID.
+ */
 function ensureArtist(name) {
     insertArtist.run(name);
     return getArtist.get(name).id;
 }
 
+/**
+ * Upsert an album, its tracks, artists, and selected artwork atomically.
+ * Existing artist links are replaced; embedded artwork is removed when a file cover wins.
+ * @param {AlbumGroup} group Album source and cover selection.
+ * @param {AlbumDetails} details Parsed album and track metadata.
+ * @param {MusicIndexStats} stats Counters updated in place.
+ * @returns {void}
+ */
 const saveAlbum = db.transaction((group, details, stats) => {
     const existingAlbum = getAlbumByKey.get(group.key);
     const artworkFileId = group.coverFileId;
@@ -470,6 +604,12 @@ const saveAlbum = db.transaction((group, details, stats) => {
     stats.albumsIndexed++;
 });
 
+/**
+ * Index recognized audio from file rows, then remove albums and artists left orphaned.
+ * Tag failures use path fallbacks; database failures propagate to the caller.
+ * @param {{parseFile: Function, selectCover: Function}} [metadataReader] Optional parser for deterministic runs.
+ * @returns {Promise<MusicIndexStats>} Index, metadata, and cleanup counts.
+ */
 async function runMusicIndexer(metadataReader) {
     // Accept a reader so indexing behavior can be exercised with deterministic
     // metadata; CLI runs still load the real ESM parser on demand.
