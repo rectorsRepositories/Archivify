@@ -3,7 +3,13 @@ const { indexedPhrase } = require("./search");
 
 const GAME_COLUMNS =
     "g.id, g.title, g.platform, g.release_year, g.genre, " +
-    "f.id AS file_id, f.filename, f.extension, f.size AS size_bytes, " +
+    "f.id AS file_id, f.filename, f.extension, " +
+    "COALESCE((SELECT SUM(member.size) FROM game_files gf " +
+    "JOIN files member ON member.id = gf.file_id WHERE gf.game_id = g.id), f.size) AS size_bytes, " +
+    "COALESCE(g.expected_disc_count, (SELECT MAX(gf.disc_number) FROM game_files gf WHERE gf.game_id = g.id), 1) AS disc_count, " +
+    "COALESCE(g.expected_file_count, NULLIF((SELECT COUNT(*) FROM game_files gf WHERE gf.game_id = g.id), 0), 1) AS file_count, " +
+    "CASE WHEN g.expected_file_count IS NULL OR g.expected_file_count = " +
+    "(SELECT COUNT(*) FROM game_files gf WHERE gf.game_id = g.id) THEN 1 ELSE 0 END AS is_complete, " +
     "f.relative_path, g.artwork_file_id, g.igdb_id, g.igdb_cover_image_id, " +
     "g.summary, g.igdb_url";
 const GAME_FROM = " FROM games g JOIN files f ON f.id = g.file_id";
@@ -19,6 +25,9 @@ const GAME_FROM = " FROM games g JOIN files f ON f.id = g.file_id";
  * @property {string} filename Game filename.
  * @property {string|null} extension Game file extension.
  * @property {number} size_bytes File size in bytes.
+ * @property {number} disc_count Number of indexed discs.
+ * @property {number} file_count Number of files in the complete game download.
+ * @property {boolean} is_complete Whether all indexed file relationships remain available.
  * @property {string} relative_path Slash-separated path below Games.
  * @property {string|null} summary IGDB summary.
  * @property {number|null} igdb_id IGDB game ID.
@@ -52,6 +61,9 @@ function publicGame(row) {
         filename: row.filename,
         extension: row.extension,
         size_bytes: row.size_bytes,
+        disc_count: row.disc_count,
+        file_count: row.file_count,
+        is_complete: Boolean(row.is_complete),
         relative_path: row.relative_path.replace(/\\/g, "/"),
         summary: row.summary,
         igdb_id: row.igdb_id,
@@ -62,7 +74,7 @@ function publicGame(row) {
                 ? "https://images.igdb.com/igdb/image/upload/t_cover_big/" +
                     encodeURIComponent(row.igdb_cover_image_id) + ".jpg"
                 : null,
-        download_url: "/api/v1/files/" + row.file_id + "/download",
+        download_url: "/api/v1/games/" + row.id + "/download",
     };
 }
 
@@ -128,7 +140,37 @@ function gameFacets() {
  */
 function getGame(id) {
     const row = db.prepare("SELECT " + GAME_COLUMNS + GAME_FROM + " WHERE g.id = ?").get(id);
-    return row ? publicGame(row) : null;
+    if (!row) return null;
+    const game = publicGame(row);
+    const members = listGameFiles(id);
+    game.files = members.map((member) => ({ id: member.id, filename: member.filename,
+        relative_path: member.relative_path.replace(/\\/g, "/"),
+        size_bytes: member.size, disc_number: member.disc_number, role: member.role,
+        download_url: "/api/v1/files/" + member.id + "/download" }));
+    game.discs = [];
+    for (const member of game.files) {
+        if (member.disc_number == null) continue;
+        let disc = game.discs.find((item) => item.number === member.disc_number);
+        if (!disc) {
+            disc = { number: member.disc_number, files: [] };
+            game.discs.push(disc);
+        }
+        disc.files.push(member);
+    }
+    return game;
 }
 
-module.exports = { listGames, gameFacets, getGame };
+function listGameFiles(id) {
+    const members = db.prepare(
+        "SELECT f.*, gf.disc_number, gf.role FROM game_files gf " +
+        "JOIN files f ON f.id = gf.file_id WHERE gf.game_id = ? " +
+        "ORDER BY gf.disc_number IS NULL DESC, gf.disc_number, " +
+        "CASE gf.role WHEN 'entry' THEN 0 ELSE 1 END, f.relative_path COLLATE NOCASE"
+    ).all(id);
+    if (members.length) return members;
+    const file = db.prepare("SELECT f.*, 1 AS disc_number, 'entry' AS role " +
+        "FROM games g JOIN files f ON f.id = g.file_id WHERE g.id = ?").get(id);
+    return file ? [file] : [];
+}
+
+module.exports = { listGames, gameFacets, getGame, listGameFiles };

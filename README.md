@@ -123,8 +123,26 @@ common disc images (`.iso`, `.chd`, `.cso`, `.zso`, `.ciso`, `.gcm`, `.rvz`, `.w
 and `.nsp`. Other supported suffixes are listed in `src/indexers/gameIndexer.js`.
 For an uncommon format, set `GAME_EXTRA_EXTENSIONS` before running
 `npm run index:games`; the file must first be in the generic file index.
-Ambiguous files such as `.bin`, `.cue`, `.gdi`, `.m3u`, and archives are not
-classified as games by default. BIOS files remain in the generic file index.
+The game indexer groups multi-file disc images from `.cue` track references,
+`.gdi` track lists, and `.ccd`/`.img`/`.sub` or `.mds`/`.mdf` companion sets.
+An `.m3u` playlist groups its referenced discs in playlist order. Without a
+playlist, files named with `(Disc 1)`, `(Disc 2)`, etc. are grouped when they
+share a folder and the rest of the filename matches. A neighboring `.game.json`
+can explicitly list disc entry files for unusual layouts, for example:
+
+```json
+{"title":"Example Game","discs":["Example A.cue","Example B.cue"]}
+```
+
+Save this as `Example A.game.json` beside `Example A.cue`; the first `discs`
+path must refer to that entry file.
+
+Paths in `discs`, playlists, and cue sheets are relative to the file containing
+them and must stay within the same platform directory. Missing referenced files
+cause an incomplete disc or playlist to be skipped. Individual `.bin` tracks,
+`.m3u` playlists, and BIOS files never become games on their own. Matching
+`.sbi` files are included with a disc when present. The game download API serves
+a standalone file directly or a ZIP containing all required files and discs.
 
 For optional IGDB metadata and cover art, set `IGDB_CLIENT_ID` and
 `IGDB_CLIENT_SECRET` from a Twitch developer application before running

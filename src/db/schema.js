@@ -209,9 +209,8 @@ function initializeSchema() {
         );
 
 
-        -- One game file per game record. BIOS and other supporting
-        -- files remain in files without becoming games. Optional metadata may
-        -- come from a sidecar file; missing values stay NULL.
+        -- file_id remains the representative entry file for compatibility with
+        -- existing databases. game_files contains the complete playable set.
         CREATE TABLE IF NOT EXISTS games (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             file_id INTEGER NOT NULL UNIQUE,
@@ -225,9 +224,23 @@ function initializeSchema() {
             igdb_cover_image_id TEXT,
             summary TEXT,
             igdb_url TEXT,
+            expected_file_count INTEGER,
+            expected_disc_count INTEGER,
             FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
             FOREIGN KEY (artwork_file_id) REFERENCES files(id) ON DELETE SET NULL
         );
+
+        CREATE TABLE IF NOT EXISTS game_files (
+            game_id INTEGER NOT NULL,
+            file_id INTEGER NOT NULL,
+            disc_number INTEGER,
+            role TEXT NOT NULL CHECK(role IN ('entry', 'data', 'playlist')),
+            PRIMARY KEY (game_id, file_id),
+            FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+            FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_game_files_file ON game_files(file_id);
 
 
         -- ---------------------------------------------------------------------
@@ -293,6 +306,13 @@ function initializeSchema() {
         CREATE INDEX IF NOT EXISTS idx_games_release_year ON games(release_year);
         CREATE INDEX IF NOT EXISTS idx_games_genre ON games(genre);
     `);
+    const gameColumns = new Set(db.prepare("PRAGMA table_info(games)").all().map((row) => row.name));
+    if (!gameColumns.has("expected_file_count")) {
+        db.exec("ALTER TABLE games ADD COLUMN expected_file_count INTEGER");
+    }
+    if (!gameColumns.has("expected_disc_count")) {
+        db.exec("ALTER TABLE games ADD COLUMN expected_disc_count INTEGER");
+    }
     initializeSearchIndexes();
 }
 

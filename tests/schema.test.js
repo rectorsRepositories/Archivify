@@ -1,9 +1,41 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { describe, it } = require("node:test");
+const Database = require("better-sqlite3");
 const { projectRoot, createFixture, closeFixture, addFile } = require("../test-support/fixture");
 
 describe("SQLite schema", () => {
+    it("adds game bundle columns to an existing games table", () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "home-archive-schema-migration-"));
+        const dbPath = path.join(root, "archive.db");
+        try {
+            const old = new Database(dbPath);
+            old.exec("CREATE TABLE games (id INTEGER PRIMARY KEY, file_id INTEGER NOT NULL UNIQUE, " +
+                "source_key TEXT NOT NULL UNIQUE, title TEXT NOT NULL, platform TEXT NOT NULL, " +
+                "release_year INTEGER, genre TEXT, artwork_file_id INTEGER, igdb_id INTEGER, " +
+                "igdb_cover_image_id TEXT, summary TEXT, igdb_url TEXT)");
+            old.close();
+            const migrated = spawnSync(process.execPath, ["-e", "require('./src/db/schema')"], {
+                cwd: projectRoot, env: { ...process.env, ARCHIVE_DB: dbPath }, encoding: "utf8",
+            });
+            assert.equal(migrated.status, 0, migrated.stderr);
+            const db = new Database(dbPath);
+            try {
+                const columns = db.prepare("PRAGMA table_info(games)").all().map((row) => row.name);
+                assert.ok(columns.includes("expected_file_count"));
+                assert.ok(columns.includes("expected_disc_count"));
+                assert.ok(db.prepare("SELECT name FROM sqlite_schema WHERE name = 'game_files'").get());
+            } finally {
+                db.close();
+            }
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+
     it("initializes repeatedly and enforces unique keys and foreign keys", () => {
         const fixture = createFixture();
         try {

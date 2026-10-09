@@ -1,5 +1,6 @@
 const { HttpError, sendJson, sendList, parseId, parseInteger, pagination, textFilter } = require("../http");
 const games = require("../services/games");
+const { sendGameDownload } = require("./gameDownload");
 
 /**
  * Serve game listings, facets, and details.
@@ -9,7 +10,7 @@ const games = require("../services/games");
  * @returns {boolean} Whether this route handled the path.
  * @throws {HttpError} For invalid filters or a missing game ID.
  */
-function routeGames(req, res, url) {
+async function routeGames(req, res, url) {
     if (url.pathname === "/api/v1/games/facets") {
         sendJson(req, res, 200, { data: games.gameFacets() });
         return true;
@@ -33,7 +34,12 @@ function routeGames(req, res, url) {
         return true;
     }
 
-    const match = /^\/api\/v1\/games\/(\d+)$/.exec(url.pathname);
+    let match = /^\/api\/v1\/games\/(\d+)\/download$/.exec(url.pathname);
+    if (match) {
+        await sendGameDownload(req, res, parseId(match[1]));
+        return true;
+    }
+    match = /^\/api\/v1\/games\/(\d+)$/.exec(url.pathname);
     if (!match) return false;
     const game = games.getGame(parseId(match[1]));
     if (!game) throw new HttpError(404, "not_found", "Game not found.");

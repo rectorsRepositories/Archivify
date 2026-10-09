@@ -3,11 +3,11 @@ const path = require("node:path");
 
 const db = require("../db/database");
 const { createIgdbClient } = require("./igdb");
+const { discoverGameSets } = require("./gameSets");
 require("../db/schema");
 
-// Index standalone game files across console generations. Ambiguous support
-// files such as .bin, .cue, .gdi, and .m3u are excluded by default because they
-// may be BIOS files or parts of a multi-file game.
+// Standalone formats become one-file discs. Manifests and their referenced
+// tracks are assembled into complete game sets by gameSets.js.
 const GAME_EXTENSIONS = new Set([
     ".iso", ".chd", ".cso", ".zso", ".ciso", ".gcm", ".rvz", ".wbfs", ".cdi", ".pbp",
     ".nes", ".fds", ".unf", ".unif", ".sfc", ".smc", ".n64", ".v64", ".z64",
@@ -31,6 +31,7 @@ const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
  * @property {unknown} [platform] Nonempty strings override the platform and IGDB query.
  * @property {unknown} [release_year] Values converting to a four-digit integer override the year.
  * @property {unknown} [genre] Nonempty strings override the genre.
+ * @property {unknown} [discs] Optional ordered entry file paths for an unusual multi-disc layout.
  */
 
 /**
@@ -51,25 +52,39 @@ const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
  */
 
 const getFiles = db.prepare(
-    "SELECT id, path, relative_path, filename, extension FROM files " +
+    "SELECT id, path, relative_path, filename, extension, category FROM files " +
     "WHERE category = 'games' ORDER BY relative_path COLLATE NOCASE, id"
 );
 const saveGame = db.prepare(
     "INSERT INTO games (file_id, source_key, title, platform, release_year, genre, artwork_file_id, " +
-    "igdb_id, igdb_cover_image_id, summary, igdb_url) " +
+    "igdb_id, igdb_cover_image_id, summary, igdb_url, expected_file_count, expected_disc_count) " +
     "VALUES (@fileId, @sourceKey, @title, @platform, @releaseYear, @genre, @artworkFileId, " +
-    "@igdbId, @igdbCoverImageId, @summary, @igdbUrl) " +
+    "@igdbId, @igdbCoverImageId, @summary, @igdbUrl, @fileCount, @discCount) " +
     "ON CONFLICT(source_key) DO UPDATE SET " +
     "file_id = excluded.file_id, title = excluded.title, platform = excluded.platform, " +
     "release_year = excluded.release_year, genre = excluded.genre, " +
     "artwork_file_id = excluded.artwork_file_id, igdb_id = excluded.igdb_id, " +
     "igdb_cover_image_id = excluded.igdb_cover_image_id, summary = excluded.summary, " +
-    "igdb_url = excluded.igdb_url"
+    "igdb_url = excluded.igdb_url, expected_file_count = excluded.expected_file_count, " +
+    "expected_disc_count = excluded.expected_disc_count"
 );
 const getExisting = db.prepare(
     "SELECT igdb_id, igdb_cover_image_id, summary, igdb_url, release_year, genre " +
     "FROM games WHERE source_key = ?"
 );
+const getGameId = db.prepare("SELECT id FROM games WHERE source_key = ?");
+const deleteGameFiles = db.prepare("DELETE FROM game_files WHERE game_id = ?");
+const addGameFile = db.prepare(
+    "INSERT INTO game_files (game_id, file_id, disc_number, role) VALUES (?, ?, ?, ?)"
+);
+const saveGameSet = db.transaction((values, members) => {
+    saveGame.run(values);
+    const gameId = getGameId.get(values.sourceKey).id;
+    deleteGameFiles.run(gameId);
+    for (const member of members) {
+        addGameFile.run(gameId, member.file.id, member.discNumber, member.role);
+    }
+});
 
 function cleanTitle(value) {
     return value.replace(/[\uF03A\uFF1A]/g, ":").replace(/_/g, " ").replace(/\s+/g, " ").trim();
@@ -160,7 +175,12 @@ function sidecarMetadata(game) {
  */
 function artworkId(game, images) {
     const candidates = images.get(game.directory + "/" + game.stem.toLowerCase());
-    return candidates?.[0]?.id ?? null;
+    if (candidates?.length) return candidates[0].id;
+    const firstDisc = game.files.find((member) => member.role === "entry");
+    if (!firstDisc || firstDisc.file.id === game.fileId) return null;
+    const stem = path.parse(firstDisc.file.filename).name.toLowerCase();
+    const directory = firstDisc.file.relative_path.split(/[\\/]+/).slice(0, -1).join("/").toLowerCase();
+    return images.get(directory + "/" + stem)?.[0]?.id ?? null;
 }
 
 /**
@@ -171,6 +191,21 @@ function artworkId(game, images) {
  */
 async function runGameIndexer() {
     const files = getFiles.all();
+    const games = discoverGameSets(files, parseGameFile);
+    const currentKeys = new Set(games.map((game) => game.sourceKey));
+    const oldByFile = db.prepare("SELECT id FROM games WHERE file_id = ?");
+    const oldByKey = db.prepare("SELECT id FROM games WHERE source_key = ?");
+    const moveGame = db.prepare("UPDATE games SET source_key = ?, file_id = ? WHERE id = ?");
+    for (const game of games) {
+        if (oldByKey.get(game.sourceKey)) continue;
+        const firstDisc = game.files.find((member) => member.role === "entry");
+        const old = firstDisc && oldByFile.get(firstDisc.file.id);
+        if (old) moveGame.run(game.sourceKey, game.fileId, old.id);
+    }
+    const deleteGame = db.prepare("DELETE FROM games WHERE id = ?");
+    for (const old of db.prepare("SELECT id, source_key FROM games").all()) {
+        if (!currentKeys.has(old.source_key)) deleteGame.run(old.id);
+    }
     const images = new Map();
     for (const file of files) {
         const extension = (file.extension || path.extname(file.filename)).toLowerCase();
@@ -196,9 +231,7 @@ async function runGameIndexer() {
 
     let indexed = 0;
     let enriched = 0;
-    for (const file of files) {
-        const game = parseGameFile(file);
-        if (!game) continue;
+    for (const game of games) {
         const metadata = sidecarMetadata(game);
         const existing = getExisting.get(game.sourceKey);
         let match = null;
@@ -214,7 +247,7 @@ async function runGameIndexer() {
         const igdbYear = match?.first_release_date
             ? new Date(match.first_release_date * 1000).getUTCFullYear()
             : null;
-        saveGame.run({
+        saveGameSet({
             fileId: game.fileId,
             sourceKey: game.sourceKey,
             title: text(metadata.title) || game.title,
@@ -227,7 +260,9 @@ async function runGameIndexer() {
             igdbCoverImageId: match?.cover?.image_id || existing?.igdb_cover_image_id || null,
             summary: text(match?.summary) || existing?.summary || null,
             igdbUrl: text(match?.url) || existing?.igdb_url || null,
-        });
+            fileCount: game.files.length,
+            discCount: game.discCount,
+        }, game.files);
         indexed++;
     }
     console.log("Games indexed: " + indexed + "; IGDB matches: " + enriched);

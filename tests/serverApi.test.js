@@ -420,7 +420,7 @@ describe("server API with indexed files and games", () => {
         const cover = await fetch(api.baseUrl + local.body.data.artwork_url);
         assert.equal(cover.status, 200);
         assert.equal(await cover.text(), "cover");
-        assert.equal(local.body.data.download_url, "/api/v1/files/" + ids.starFile + "/download");
+        assert.equal(local.body.data.download_url, "/api/v1/games/" + ids.star + "/download");
         assert.equal(local.body.data.relative_path, "Wii/Star Fox.iso");
         const remote = await getJson(api.baseUrl, "/api/v1/games/" + ids.nebula);
         assert.equal(remote.body.data.artwork_url,

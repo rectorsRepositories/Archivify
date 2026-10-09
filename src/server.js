@@ -34,7 +34,7 @@ function createServer() {
                 return;
             }
 
-            if (routeGames(req, res, url)) {
+            if (await routeGames(req, res, url)) {
                 return;
             }
 

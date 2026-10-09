@@ -11,7 +11,7 @@ function DownloadSection({ title, icon: Icon, results, describe, itemDetail }) {
     <section className="download-section">
       <div className="results-heading"><h2><Icon size={19} /> {title} <span>{results.total}</span></h2><p>{describe}</p></div>
       {results.loading ? <div className="search-loading">Loading {title.toLowerCase()}…</div> : results.error && !results.items.length ? <div className="empty-state"><h3>Could not load {title.toLowerCase()}</h3><p>{results.error}</p><button type="button" className="secondary-button" onClick={results.retry}>Try again</button></div> : results.items.length ? <>
-        <div className="download-list">{results.items.map((item) => <div className="download-row" key={item.id}><div className="download-row-art">{item.artwork_url ? <img src={item.artwork_url} alt="" loading="lazy" /> : <Icon size={24} aria-hidden="true" />}</div><div className="download-row-info"><strong>{item.title}</strong><small>{itemDetail(item)} · {formatBytes(item.size_bytes)}</small></div><a href={item.download_url} className="secondary-button" aria-label={'Download ' + item.title}><Download size={16} /> Download</a></div>)}</div>
+        <div className="download-list">{results.items.map((item) => <div className="download-row" key={item.id}><div className="download-row-art">{item.artwork_url ? <img src={item.artwork_url} alt="" loading="lazy" /> : <Icon size={24} aria-hidden="true" />}</div><div className="download-row-info"><strong>{item.title}</strong><small>{itemDetail(item)} · {formatBytes(item.size_bytes)}</small></div>{item.is_complete === false ? <span className="secondary-button" aria-label={`${item.title} is incomplete`}>Incomplete</span> : <a href={item.download_url} className="secondary-button" aria-label={'Download ' + item.title + (item.disc_count > 1 ? `, all ${item.disc_count} discs` : '')}><Download size={16} /> Download</a>}</div>)}</div>
         <PagedFooter shown={results.items.length} total={results.total} hasMore={results.hasMore} loadingMore={results.loadingMore} error={results.error} onLoadMore={results.loadMore} />
       </> : <div className="search-no-results">No {title.toLowerCase()} are indexed yet.</div>}
     </section>
@@ -27,7 +27,7 @@ export default function Downloads() {
       <div className="page-heading"><div><span className="eyebrow">TAKE YOUR COLLECTION WITH YOU</span><h1>Downloads<span className="heading-dot">.</span></h1><p>Save complete albums or game files from your archive.</p></div></div>
       <div className="download-intro">Need one song? Open an <Link to="/music">album</Link> to download individual tracks.</div>
       <DownloadSection title="Music" icon={Disc3} results={albums} describe="Albums as ZIP files" itemDetail={(album) => artistNames(album.artists)} />
-      <DownloadSection title="Games" icon={Gamepad2} results={games} describe="Original game files" itemDetail={(game) => game.platform} />
+      <DownloadSection title="Games" icon={Gamepad2} results={games} describe="Complete game downloads" itemDetail={(game) => game.platform + (game.disc_count > 1 ? ` · ${game.disc_count} discs` : '')} />
     </div>
   )
 }
