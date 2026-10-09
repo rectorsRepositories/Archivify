@@ -28,6 +28,7 @@ describe("SQLite schema", () => {
                 assert.ok(columns.includes("expected_file_count"));
                 assert.ok(columns.includes("expected_disc_count"));
                 assert.ok(db.prepare("SELECT name FROM sqlite_schema WHERE name = 'game_files'").get());
+                assert.ok(db.prepare("SELECT name FROM sqlite_schema WHERE name = 'books'").get());
             } finally {
                 db.close();
             }
@@ -91,6 +92,41 @@ describe("SQLite schema", () => {
         } finally {
             closeFixture(fixture);
         }
+    });
+
+    it("enforces book membership keys and cascades book metadata without restricting shared ISBNs", () => {
+        const fixture = createFixture();
+        try {
+            fixture.db.pragma("foreign_keys = ON");
+            const epub = addFile(fixture, "books", "Edition.epub", "epub");
+            const txt = addFile(fixture, "books", "Edition.txt", "txt");
+            const insert = fixture.db.prepare("INSERT INTO books (source_key, title, created_at, indexed_at) VALUES (?, ?, 1000, 1000)");
+            const first = Number(insert.run("Edition", "Edition").lastInsertRowid);
+            const second = Number(insert.run("Other", "Other").lastInsertRowid);
+            assert.throws(() => insert.run("Edition", "Duplicate"), /UNIQUE/);
+            const link = fixture.db.prepare("INSERT INTO book_files VALUES (?, ?, ?)");
+            link.run(first, epub, "epub");
+            link.run(first, txt, "txt");
+            assert.throws(() => link.run(second, epub, "epub"), /UNIQUE/);
+            assert.throws(() => link.run(second, epub + 1000, "epub"), /FOREIGN KEY/);
+            const identifier = fixture.db.prepare("INSERT INTO book_identifiers VALUES (?, 'isbn13', '9780306406157', 'epub')");
+            identifier.run(first);
+            identifier.run(second);
+            fixture.db.prepare("INSERT INTO book_contributors (book_id, name, role, position) VALUES (?, 'Writer', 'aut', 0)").run(first);
+            fixture.db.prepare("INSERT INTO book_subjects VALUES (?, 'Fiction', '')").run(first);
+            fixture.db.prepare("INSERT INTO book_languages VALUES (?, 'en')").run(first);
+            fixture.db.prepare("INSERT INTO book_artwork VALUES (?, 'image/png', ?, 'checksum')").run(first, Buffer.from("cover"));
+            fixture.db.prepare("INSERT INTO book_index_state VALUES (?, 'fingerprint', 1, 'ok', 1000, 1000, NULL)").run(first);
+            fixture.db.prepare("DELETE FROM files WHERE id = ?").run(epub);
+            assert.equal(fixture.db.prepare("SELECT COUNT(*) AS count FROM book_files WHERE book_id = ?").get(first).count, 1);
+            assert.ok(fixture.db.prepare("SELECT id FROM books WHERE id = ?").get(first));
+            fixture.db.prepare("DELETE FROM books WHERE id = ?").run(first);
+            for (const table of ["book_files", "book_identifiers", "book_contributors", "book_subjects", "book_languages", "book_artwork", "book_index_state"]) {
+                assert.equal(fixture.db.prepare("SELECT COUNT(*) AS count FROM " + table + " WHERE book_id = ?").get(first).count, 0, table);
+            }
+            assert.equal(fixture.db.prepare("SELECT COUNT(*) AS count FROM book_identifiers").get().count, 1);
+            assert.deepEqual(fixture.db.prepare("SELECT rowid FROM book_contributors_fts WHERE book_contributors_fts MATCH '\"Writer\"'").all(), []);
+        } finally { closeFixture(fixture); }
     });
 
     it("cascades album and artist junction rows while retaining tracks", () => {

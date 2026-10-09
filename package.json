@@ -12,16 +12,26 @@
     "index:files": "node src/indexers/fileIndexer.js",
     "index:music": "node src/indexers/musicIndexer.js",
     "index:games": "node src/indexers/gameIndexer.js",
-    "index": "npm run index:files && npm run index:music && npm run index:games"
+    "index:books": "node src/indexers/bookIndexer.js",
+    "index": "npm run index:files && npm run index:music && npm run index:games && npm run index:books"
   },
   "dependencies": {
     "archiver": "^8.0.0",
     "better-sqlite3": "^13.0.3",
+    "dompurify": "^3.4.16",
+    "epubjs": "^0.3.93",
     "lucide-react": "^0.468.0",
     "music-metadata": "^11.16.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "saxes": "^6.0.0",
+    "yauzl": "^3.4.0"
+  },
+  "overrides": {
+    "epubjs": {
+      "@xmldom/xmldom": "^0.8.15"
+    }
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

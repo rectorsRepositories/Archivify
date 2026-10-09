@@ -34,9 +34,9 @@ the Ubuntu prerequisite commands above and retry `npm ci` in the repository.
 
 Media in `archive/`, the SQLite database in `data/`, and `.env` are ignored by
 Git, so a clone does not contain them. Copy or mount your media separately. Set
-`ARCHIVE_ROOT` to the directory containing the `Music`, `Games`, `Pictures`, and
-`Videos` folders. Folder names must match that capitalization on case-sensitive
-file systems. If `ARCHIVE_ROOT` is unset, the indexer and API use the test
+`ARCHIVE_ROOT` to the directory containing the `Music`, `Games`, `Books`,
+`Pictures`, and `Videos` folders. Folder names must match that capitalization
+on case-sensitive file systems. If `ARCHIVE_ROOT` is unset, the indexer and API use the test
 archive in the repository's `archive/` directory on Windows and the production
 archive at `/Archive` on other systems. The process must be able to read the
 media and write to the database directory. The API resolves indexed files from
@@ -69,8 +69,8 @@ and the commands it starts.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ARCHIVE_ROOT` | Repository `archive/` on Windows; `/Archive` elsewhere | Media root scanned by `index:files` and served by the API; contains `Music`, `Games`, `Pictures`, and `Videos`. |
-| `ARCHIVE_DB` | `data/archive.db` in the repository | SQLite index used by the API and all three indexers. Its parent directory is created if needed. |
+| `ARCHIVE_ROOT` | Repository `archive/` on Windows; `/Archive` elsewhere | Media root scanned by `index:files` and served by the API; contains `Music`, `Games`, `Books`, `Pictures`, and `Videos`. |
+| `ARCHIVE_DB` | `data/archive.db` in the repository | SQLite index used by the API and all four indexers. Its parent directory is created if needed. |
 | `HOST` | `127.0.0.1` | Address where the API listens when started with `npm start` or by `npm run dev` / `npm run preview`. Use `0.0.0.0` only when the API itself should accept network connections. |
 | `PORT` | `3000` | API port, also used by the Vite `/api` proxy. Must be an integer from 1 to 65535. |
 | `IGDB_CLIENT_ID` | unset | Optional Twitch developer application client ID for game metadata lookup during indexing. |
@@ -92,11 +92,12 @@ set if needed, run:
 npm run index
 ```
 
-This runs `index:files`, then `index:music`, then `index:games`. The file indexer
-scans the four category folders and stores absolute file paths in SQLite. The
-music and game indexers read those file records to add metadata. Run the full
-command again after adding or changing files. To run a stage separately, use
-`npm run index:files`, `npm run index:music`, or `npm run index:games`; run the
+This runs `index:files`, then `index:music`, then `index:games`, then `index:books`.
+The file indexer scans the five category folders and stores absolute file paths
+in SQLite. The music, game, and book indexers read those file records to add
+metadata. Run the full command again after adding or changing files. To run a stage separately, use
+`npm run index:files`, `npm run index:music`, `npm run index:games`, or
+`npm run index:books`; run the
 file stage first when the archive contents have changed.
 
 The file indexer leaves records for deleted files in place by default. After
@@ -106,6 +107,7 @@ confirming that the media is available and readable, remove stale records with:
 npm run index:files -- --prune
 npm run index:music
 npm run index:games
+npm run index:books
 ```
 
 Missing category folders are reported and skipped. On a new machine, use a new
@@ -158,6 +160,103 @@ Unmatched games keep their cleaned filename title and nullable metadata. A
 `release_year`, and `genre`; a `.jpg`, `.jpeg`, `.png`, or `.webp` file with the
 same name stem beside the game is used as local cover art.
 
+## Books
+
+Store books below `Books/` in the configured archive root. Nested directories
+are supported, including `Books/English/`. Files with the same case-sensitive
+stem in the same directory form one book edition:
+
+```text
+Books/English/Frankenstein.epub
+Books/English/Frankenstein.txt
+Books/English/Frankenstein.book.json  # optional corrections
+```
+
+For just the books backend, run `npm run index:files` followed by
+`npm run index:books`. The book indexer reads EPUB 2 and EPUB 3 metadata locally;
+it makes no external metadata requests. It extracts titles, ordered contributors
+and roles, languages, identifiers (including validated ISBNs and Gutenberg IDs),
+subjects, description, publisher, dates, rights, series, layout, and cover art.
+Other embedded metadata, including accessibility and source links, is preserved
+in the detail response's `metadata.raw` array. `metadata.sources` records origins.
+
+EPUB publication year and original publication year are separate. The original
+year stays null unless explicitly supplied. A missing ISBN is normal, particularly
+for Gutenberg books. Invalid declared ISBNs are retained as `invalid_isbn`
+identifiers and are excluded from the convenience ISBN fields. Identifiers are
+not globally unique: separate editions can share an ISBN or Gutenberg ID.
+
+`page_count` is populated only from explicit metadata or a sidecar. Navigation
+page markers are counted separately in `page_marker_count`; they do not establish
+a complete page count. `word_count` is an approximate count from linear EPUB
+body content, excluding scripts, styles, and navigation. It may be null if content
+cannot be parsed within the read limits. Missing metadata remains null.
+
+Covers are cached as separate SQLite blobs and served through `/books/:id/artwork`.
+JPEG, PNG, GIF, and WebP covers are supported through EPUB 3 manifest properties
+or EPUB 2 cover metadata. SVG covers currently produce a warning and no artwork.
+Missing optional covers/navigation and failed word counts are reported in
+`metadata.warnings`; they do not prevent bibliographic indexing. ZIP reads are
+bounded to 20,000 entries, 8 MiB per XML member, 16 MiB per cover, and 64 MiB
+of total decompressed content read. External XML entities are never resolved.
+
+TXT-only books receive filename titles and can be downloaded. Recognized
+Gutenberg TXT headers can fill missing titles, authors, supported language codes,
+and Gutenberg IDs. `can_read` is true only for an EPUB whose metadata index state
+is successful; it is a capability hint, not browser-reader or DRM validation.
+The client Books page displays cover cards with reading and EPUB/TXT download
+actions. It supports title/author/subject search, author/language/subject/format
+filters, sorting, and paginated loading. Books also appear on Home, Search, and
+Downloads. Open a Read action to use the EPUB viewer with chapter navigation,
+page buttons/arrow keys, text size, and paper/sepia/night themes. Preferences and
+revision-specific reading positions are saved in this browser. Printed page
+counts remain distinct from the reader's responsive section page numbers.
+
+The reader loads on demand and sanitizes chapters before rendering them in
+sandboxed iframes. EPUB scripts, forms, external links, and remote resources are
+disabled; packaged images and styles are supported. TXT-only books and EPUBs
+with indexing errors can be downloaded but cannot be opened in the reader.
+DRM-protected EPUBs are unsupported.
+
+An optional same-stem `.book.json` file overrides embedded metadata. For example:
+
+```json
+{
+  "title": "Frankenstein",
+  "authors": ["Mary Shelley"],
+  "original_publication_year": 1818,
+  "page_count": 280,
+  "languages": ["en"],
+  "subjects": ["Gothic fiction"],
+  "identifiers": [{ "scheme": "gutenberg", "value": "84" }]
+}
+```
+
+Supported scalar overrides are `title`, `subtitle`, `sort_title`, `description`,
+`publisher`, `publication_date`, `publication_year`, `original_publication_year`,
+`series_name`, `series_position`, `page_count`, `page_count_source`,
+`page_marker_count`, `word_count`, `rights`, `epub_version`, and `layout`.
+Optional scalars accept null to clear a value; title must be nonempty. A page
+count override automatically records `sidecar` as its source. Changing
+`publication_date` also updates its derived year unless a year is explicitly supplied.
+
+Array overrides replace their existing values, and empty arrays clear them.
+`authors`, `subjects`, and `languages` accept strings. Use `contributors` instead
+of `authors` for objects with `name`, `role` (for example `aut`, `trl`, `edt`,
+or `ill`), optional `sort_name`, and optional `authority_id`. Identifier objects
+use string `scheme` and `value` fields. Unknown keys, invalid values, and malformed
+sidecars fail that source's refresh and preserve its previous successful metadata.
+
+Successful unchanged sources skip EPUB parsing using format file size/mtime,
+file IDs, sidecar contents, and parser version. Use `npm run index:books -- --force`
+to rebuild all book metadata. Errors produce a nonzero exit status after other
+books are processed, are stored in `book_index_state`, and are retried on the next
+run. Failed updates retain earlier metadata and artwork. Book IDs remain stable
+across retagging and adding/removing a format; renaming the source creates a new ID.
+Run file indexing with `--prune` and then book indexing to reconcile deletions.
+A book is removed only after all its format records are pruned. Missing/unreadable
+archive folders are never treated as proof that the books were deleted.
+
 ## Start the API and client
 
 For development, run `npm run dev` from the repository root. It uses an API
@@ -188,7 +287,7 @@ All endpoints are under /api/v1 and currently support GET and HEAD.
 | Endpoint | Purpose |
 | --- | --- |
 | /health | Check server and database availability |
-| /library/summary | File totals by category, music totals, and game totals |
+| /library/summary | File totals by category, music totals, game totals, and book totals |
 | /files | Search and list indexed files |
 | /files/:id | File metadata |
 | /files/:id/content | Inline file content, including byte ranges |
@@ -204,12 +303,26 @@ All endpoints are under /api/v1 and currently support GET and HEAD.
 | /music/tracks/:id | Track details |
 | /games | Search and list indexed games |
 | /games/:id | Game details, metadata, artwork URL, and download URL |
+| /books | Search and list books, with format, artwork, and reader URLs |
+| /books/facets | Available authors, languages, subjects, and publication years |
+| /books/:id | Complete book metadata, identifiers, provenance, and available formats |
+| /books/:id/artwork | Cached raster cover; supports ETag conditional requests |
+| /books/:id/content | Inline EPUB, including byte ranges |
+| /books/:id/download | Preferred EPUB/TXT attachment; use `?format=epub` or `?format=txt` to select |
 
 Lists accept limit (default 30, maximum 100) and offset. File filters are q,
 category, extension, and path (a relative path prefix). Album filters are q,
 artist_id, year, and genre. Track filters also accept album_id. Artist lists
 accept q.
 Game filters are q, platform, genre, and year.
+Book filters are q, author, language, subject, year, and format. Book search matches
+title, subtitle, description, contributor names, identifiers, and subjects.
+The author/language/subject filters match exactly, ignoring case; author excludes
+translator and editor credits. Book sort options are title (default), newest,
+oldest, and added. Year sorts use EPUB publication year, with missing years last.
+Book format values are `epub` and `txt`. A missing book or requested format returns
+404; an invalid format/filter returns 400. Downloads without a format prefer EPUB,
+then TXT. Book `gutenberg_id`, `isbn10`, and `isbn13` values are strings or null.
 
 List responses contain data and pagination (limit, offset, total). Detail
 responses contain data. Sizes are bytes, durations are milliseconds, and missing
@@ -223,6 +336,7 @@ characters use SQLite FTS5 to narrow candidates; short and punctuation-heavy
 searches use the original substring query. Existing databases build these search
 indexes once at the next server or indexer startup, so that first startup may
 take longer for a large archive. The indexes stay synchronized as rows change.
+Books gain metadata and contributor FTS indexes on the first upgraded startup.
 File content supports a single byte range on GET. HEAD, unsupported range units,
 and multipart range requests receive the complete file headers or content.
 

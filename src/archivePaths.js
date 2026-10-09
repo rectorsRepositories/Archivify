@@ -7,6 +7,7 @@ const archiveRoot = path.resolve(process.env.ARCHIVE_ROOT || (process.platform =
 const categoryFolders = {
     music: "Music",
     games: "Games",
+    books: "Books",
     pictures: "Pictures",
     videos: "Videos",
 };

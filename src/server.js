@@ -6,6 +6,7 @@ require("./db/schema");
 const { HttpError, sendJson, sendError, parseInteger } = require("./http");
 const { routeMusic } = require("./routes/music");
 const { routeGames } = require("./routes/games");
+const { routeBooks } = require("./routes/books");
 const { routeFiles } = require("./routes/files");
 const { routeDownloads } = require("./routes/downloads");
 const healthQuery = db.prepare("SELECT 1");
@@ -35,6 +36,10 @@ function createServer() {
             }
 
             if (await routeGames(req, res, url)) {
+                return;
+            }
+
+            if (await routeBooks(req, res, url)) {
                 return;
             }
 

@@ -244,6 +244,99 @@ function initializeSchema() {
 
 
         -- ---------------------------------------------------------------------
+        -- Books: a source is one edition, with EPUB/TXT formats attached.
+        -- Optional metadata remains nullable; identifiers are not globally unique.
+        -- ---------------------------------------------------------------------
+
+        CREATE TABLE IF NOT EXISTS books (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_key TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            subtitle TEXT,
+            sort_title TEXT,
+            description TEXT,
+            publisher TEXT,
+            publication_date TEXT,
+            publication_year INTEGER,
+            original_publication_year INTEGER,
+            series_name TEXT,
+            series_position REAL,
+            page_count INTEGER CHECK(page_count > 0),
+            page_count_source TEXT,
+            page_marker_count INTEGER CHECK(page_marker_count >= 0),
+            word_count INTEGER CHECK(word_count >= 0),
+            rights TEXT,
+            epub_version TEXT,
+            layout TEXT,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at INTEGER NOT NULL,
+            indexed_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS book_files (
+            book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL UNIQUE REFERENCES files(id) ON DELETE CASCADE,
+            format TEXT NOT NULL CHECK(format IN ('epub', 'txt')),
+            PRIMARY KEY (book_id, format)
+        );
+
+        CREATE TABLE IF NOT EXISTS book_contributors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            sort_name TEXT,
+            role TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            authority_id TEXT,
+            UNIQUE(book_id, position)
+        );
+
+        CREATE TABLE IF NOT EXISTS book_identifiers (
+            book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            scheme TEXT NOT NULL,
+            value TEXT NOT NULL,
+            source TEXT NOT NULL,
+            PRIMARY KEY (book_id, scheme, value)
+        );
+
+        CREATE TABLE IF NOT EXISTS book_subjects (
+            book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            vocabulary TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (book_id, name, vocabulary)
+        );
+
+        CREATE TABLE IF NOT EXISTS book_languages (
+            book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            code TEXT NOT NULL,
+            PRIMARY KEY (book_id, code)
+        );
+
+        CREATE TABLE IF NOT EXISTS book_artwork (
+            book_id INTEGER PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+            mime_type TEXT NOT NULL,
+            image_data BLOB NOT NULL,
+            checksum TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS book_index_state (
+            book_id INTEGER PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+            fingerprint TEXT NOT NULL,
+            parser_version INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('ok', 'error')),
+            last_attempt_at INTEGER NOT NULL,
+            last_success_at INTEGER,
+            error TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_books_title ON books(title COLLATE NOCASE);
+        CREATE INDEX IF NOT EXISTS idx_books_year ON books(publication_year);
+        CREATE INDEX IF NOT EXISTS idx_book_contributors_name ON book_contributors(name COLLATE NOCASE);
+        CREATE INDEX IF NOT EXISTS idx_book_identifiers_value ON book_identifiers(value);
+        CREATE INDEX IF NOT EXISTS idx_book_subjects_name ON book_subjects(name COLLATE NOCASE);
+        CREATE INDEX IF NOT EXISTS idx_book_languages_code ON book_languages(code);
+
+        -- ---------------------------------------------------------------------
         -- Files indexes
         -- ---------------------------------------------------------------------
 

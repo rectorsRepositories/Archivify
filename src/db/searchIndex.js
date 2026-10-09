@@ -3,6 +3,8 @@ const db = require("./database");
 const SEARCH_TABLES = [
     { table: "files", columns: ["filename", "relative_path"] },
     { table: "games", columns: ["title", "platform"] },
+    { table: "books", columns: ["title", "subtitle", "description"] },
+    { table: "book_contributors", columns: ["name"] },
     { table: "artists", columns: ["name"] },
     { table: "albums", columns: ["title"] },
     { table: "tracks", columns: ["title"] },

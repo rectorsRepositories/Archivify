@@ -114,3 +114,21 @@ it("backfills FTS when an existing database first gains the search index", () =>
         closeFixture(fixture);
     }
 });
+
+it("backfills existing book and contributor metadata when their FTS indexes are added", () => {
+    const fixture = createFixture();
+    try {
+        for (const table of ["books", "book_contributors"]) {
+            for (const suffix of ["insert", "delete", "update"]) fixture.db.exec("DROP TRIGGER " + table + "_fts_" + suffix);
+            fixture.db.exec("DROP TABLE " + table + "_fts");
+        }
+        const id = Number(fixture.db.prepare("INSERT INTO books (source_key, title, created_at, indexed_at) VALUES ('Legacy', 'Legacy Book', 1000, 1000)").run().lastInsertRowid);
+        const contributorId = Number(fixture.db.prepare("INSERT INTO book_contributors (book_id, name, role, position) VALUES (?, 'Legacy Writer', 'aut', 0)").run(id).lastInsertRowid);
+        const upgrade = spawnSync(process.execPath, ["-e", "require('./src/db/schema')"], {
+            cwd: projectRoot, env: { ...process.env, ARCHIVE_DB: fixture.dbPath }, encoding: "utf8",
+        });
+        assert.equal(upgrade.status, 0, upgrade.stderr);
+        assert.deepEqual(fixture.db.prepare("SELECT rowid FROM books_fts WHERE books_fts MATCH '\"Legacy\"'").all(), [{ rowid: id }]);
+        assert.deepEqual(fixture.db.prepare("SELECT rowid FROM book_contributors_fts WHERE book_contributors_fts MATCH '\"Writer\"'").all(), [{ rowid: contributorId }]);
+    } finally { closeFixture(fixture); }
+});

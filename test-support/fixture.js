@@ -11,7 +11,7 @@ function createFixture() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "home-archive-test-"));
     const archiveRoot = path.join(root, "archive");
     const dbPath = path.join(root, "archive.db");
-    for (const category of ["Music", "Games", "Pictures", "Videos"]) {
+    for (const category of ["Music", "Games", "Books", "Pictures", "Videos"]) {
         fs.mkdirSync(path.join(archiveRoot, category), { recursive: true });
     }
     // Schema initialization must receive the temporary path before database.js
@@ -33,7 +33,7 @@ function closeFixture(fixture) {
 
 function writeMedia(fixture, category, relativePath, bytes) {
     const folder = {
-        music: "Music", games: "Games", pictures: "Pictures", videos: "Videos",
+        music: "Music", games: "Games", books: "Books", pictures: "Pictures", videos: "Videos",
     }[category];
     const fullPath = path.join(fixture.archiveRoot, folder, ...relativePath.split("/"));
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
@@ -43,7 +43,7 @@ function writeMedia(fixture, category, relativePath, bytes) {
 
 function addFile(fixture, category, relativePath, bytes, options = {}) {
     const folder = {
-        music: "Music", games: "Games", pictures: "Pictures", videos: "Videos",
+        music: "Music", games: "Games", books: "Books", pictures: "Pictures", videos: "Videos",
     }[category];
     const fullPath = path.join(fixture.archiveRoot, folder, ...relativePath.split("/"));
     if (!options.missing) writeMedia(fixture, category, relativePath, bytes);

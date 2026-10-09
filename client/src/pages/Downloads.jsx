@@ -1,8 +1,9 @@
-import { Disc3, Download, Gamepad2 } from 'lucide-react'
+import { BookOpen, Disc3, Download, Gamepad2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import PagedFooter from '../components/common/PagedFooter.jsx'
 import { listAlbums } from '../api/music.js'
 import { listGames } from '../api/games.js'
+import { listBooks } from '../api/books.js'
 import { artistNames, formatBytes } from '../api/format.js'
 import usePagedResults from '../hooks/usePagedResults.js'
 
@@ -21,13 +22,16 @@ function DownloadSection({ title, icon: Icon, results, describe, itemDetail }) {
 export default function Downloads() {
   const albums = usePagedResults(listAlbums, { sort: 'title' }, 12)
   const games = usePagedResults(listGames, { sort: 'title' }, 12)
+  const books = usePagedResults(listBooks, { sort: 'title' }, 12)
+  const bookDownloads = { ...books, items: books.items.map((book) => ({ ...book, size_bytes: book.formats[0]?.size_bytes ?? 0 })) }
 
   return (
     <div className="library-page page-stack">
-      <div className="page-heading"><div><span className="eyebrow">TAKE YOUR COLLECTION WITH YOU</span><h1>Downloads<span className="heading-dot">.</span></h1><p>Save complete albums or game files from your archive.</p></div></div>
-      <div className="download-intro">Need one song? Open an <Link to="/music">album</Link> to download individual tracks.</div>
+      <div className="page-heading"><div><span className="eyebrow">TAKE YOUR COLLECTION WITH YOU</span><h1>Downloads<span className="heading-dot">.</span></h1><p>Save albums, games, or books from your archive.</p></div></div>
+      <div className="download-intro">Need one song? Open an <Link to="/music">album</Link> to download individual tracks. Visit <Link to="/books">Books</Link> to choose an EPUB or text edition.</div>
       <DownloadSection title="Music" icon={Disc3} results={albums} describe="Albums as ZIP files" itemDetail={(album) => artistNames(album.artists)} />
       <DownloadSection title="Games" icon={Gamepad2} results={games} describe="Complete game downloads" itemDetail={(game) => game.platform + (game.disc_count > 1 ? ` · ${game.disc_count} discs` : '')} />
+      <DownloadSection title="Books" icon={BookOpen} results={bookDownloads} describe="EPUB editions, or text when EPUB is unavailable" itemDetail={(book) => `${book.authors.join(', ') || 'Unknown author'} · ${book.formats[0]?.format.toUpperCase() || 'Book'}`} />
     </div>
   )
 }

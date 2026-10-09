@@ -6,7 +6,7 @@ export default function Header({ onMenu, menuOpen, menuButtonRef }) {
   const [search, setSearch] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
-  const sectionTitle = location.pathname.startsWith('/music/albums/') ? 'Album details' : location.pathname.startsWith('/music') ? 'Music library' : location.pathname.startsWith('/games') ? 'Games library' : location.pathname.startsWith('/search') ? 'Search archive' : location.pathname.startsWith('/downloads') ? 'Downloads' : 'Collection overview'
+  const sectionTitle = location.pathname.startsWith('/music/albums/') ? 'Album details' : location.pathname.startsWith('/music') ? 'Music library' : location.pathname.startsWith('/games') ? 'Games library' : /^\/books\/[^/]+\/read$/.test(location.pathname) ? 'Book reader' : location.pathname.startsWith('/books') ? 'Books library' : location.pathname.startsWith('/search') ? 'Search archive' : location.pathname.startsWith('/downloads') ? 'Downloads' : 'Collection overview'
 
   function onSubmit(event) {
     event.preventDefault()

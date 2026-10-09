@@ -124,8 +124,8 @@ function getFile(id) {
 }
 
 /**
- * Aggregate file counts and sizes plus indexed music and game totals.
- * @returns {object} Category, music, and game summary data.
+ * Aggregate file counts and sizes plus indexed music, game, and book totals.
+ * @returns {object} Category, music, game, and book summary data.
  */
 function librarySummary() {
     const categories = db.prepare(
@@ -147,6 +147,10 @@ function librarySummary() {
         games: {
             titles: db.prepare("SELECT COUNT(*) AS count FROM games").get().count,
             platforms: db.prepare("SELECT COUNT(DISTINCT platform) AS count FROM games").get().count,
+        },
+        books: {
+            titles: db.prepare("SELECT COUNT(*) AS count FROM books").get().count,
+            authors: db.prepare("SELECT COUNT(DISTINCT name) AS count FROM book_contributors WHERE lower(role) IN ('aut', 'author')").get().count,
         },
     };
 }

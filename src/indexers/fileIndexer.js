@@ -18,6 +18,7 @@ require("../db/schema");
 const ARCHIVE_DIRECTORIES = {
     music: path.join(ARCHIVE_ROOT, "Music"),
     games: path.join(ARCHIVE_ROOT, "Games"),
+    books: path.join(ARCHIVE_ROOT, "Books"),
     pictures: path.join(ARCHIVE_ROOT, "Pictures"),
     videos: path.join(ARCHIVE_ROOT, "Videos"),
 };

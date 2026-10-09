@@ -18,6 +18,8 @@ node_modules/
 .npm-cache/
 dist/
 coverage/
+output/playwright/
+.playwright-cli/
 
 # Runtime and package-manager logs
 *.log

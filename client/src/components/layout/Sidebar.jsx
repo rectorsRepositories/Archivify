@@ -1,10 +1,11 @@
-import { Archive, Download, Gamepad2, HardDrive, House, Music2, Search } from 'lucide-react'
+import { Archive, BookOpen, Download, Gamepad2, HardDrive, House, Music2, Search } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 const mainNav = [
   { to: '/', label: 'Home', icon: House, end: true },
   { to: '/music', label: 'Music', icon: Music2 },
   { to: '/games', label: 'Games', icon: Gamepad2 },
+  { to: '/books', label: 'Books', icon: BookOpen },
   { to: '/search', label: 'Search', icon: Search },
 ]
 

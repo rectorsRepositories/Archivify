@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gamepad2, House, Music2, Search, X } from 'lucide-react'
+import { BookOpen, Gamepad2, House, Music2, Search, X } from 'lucide-react'
 import Sidebar from './Sidebar.jsx'
 import Header from './Header.jsx'
 import MusicPlayer from '../music/MusicPlayer.jsx'
@@ -186,6 +186,7 @@ export default function PageLayout() {
         <NavLink to="/" end><House size={20} /><span>Home</span></NavLink>
         <NavLink to="/music"><Music2 size={20} /><span>Music</span></NavLink>
         <NavLink to="/games"><Gamepad2 size={20} /><span>Games</span></NavLink>
+        <NavLink to="/books"><BookOpen size={20} /><span>Books</span></NavLink>
         <NavLink to="/search"><Search size={20} /><span>Search</span></NavLink>
       </nav>
       {toast && <div className={playback ? 'toast toast-with-player' : 'toast'} role="status"><span>{toast}</span><button type="button" onClick={() => setToast('')} aria-label="Dismiss notification"><X size={16} /></button></div>}

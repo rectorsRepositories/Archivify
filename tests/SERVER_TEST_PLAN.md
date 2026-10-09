@@ -24,7 +24,7 @@ actual symlinks or changing permissions is restricted.
 - Set `ARCHIVE_ROOT`, `ARCHIVE_DB`, and IGDB variables explicitly in child process
   environments. Never point tests at the repository's real `archive/` or
   `data/archive.db`.
-- Put shared helpers in `test-support/`: create four category folders, write
+- Put shared helpers in `test-support/`: create five category folders, write
   small fixture files, run an indexer process, seed SQLite through the real
   schema, start the API on an ephemeral localhost port, and clean up resources.
 - For API tests, start `createServer()` only after setting `ARCHIVE_DB` in an
@@ -67,6 +67,17 @@ actual symlinks or changing permissions is restricted.
 | IGDB client | Exact title/platform and alternative title matching; platform aliases; token failures; escaped query input; 429 retry; search errors | Deterministic matching and graceful indexing fallback without live requests |
 
 ## Suite map
+
+- `tests/epubMetadata.test.js`: generated EPUB 2/3 ZIPs, metadata, contributor roles,
+  ISBN validation, covers, page markers, word counts, malformed XML/ZIPs, and read limits.
+- `tests/bookIndexer.test.js`: EPUB/TXT grouping, sidecars, unchanged/forced scans,
+  failures and retries, TXT headers, stable IDs, and pruning/missing-mount behavior.
+- `tests/booksApi.test.js`: book metadata/search/filter/facets, FTS synchronization,
+  library totals, portable file resolution, cover caching, downloads/ranges/HEAD,
+  and validation/missing-resource errors.
+- `test-support/epub.js` generates tiny real EPUB fixtures. Automated suites never
+  depend on the user's `archive/Books`; local books may be checked read-only using
+  a separate temporary database.
 
 - `tests/serverApi.test.js`: server, HTTP helpers, files, downloads, and games API.
 - `tests/fileIndexer.test.js`, `tests/gameIndexer.test.js`, and

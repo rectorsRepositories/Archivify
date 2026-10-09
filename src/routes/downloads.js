@@ -24,6 +24,8 @@ const CONTENT_TYPES = {
     ".webp": "image/webp",
     ".gif": "image/gif",
     ".pdf": "application/pdf",
+    ".epub": "application/epub+zip",
+    ".txt": "text/plain; charset=utf-8",
 };
 
 /**
