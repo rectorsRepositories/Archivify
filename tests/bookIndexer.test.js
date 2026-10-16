@@ -106,6 +106,28 @@ it("indexes TXT-only Gutenberg headers and filename fallbacks while isolating co
     } finally { closeFixture(fixture); }
 });
 
+it("preserves an existing book's metadata and membership when indexed formats conflict", async () => {
+    const fixture = createFixture();
+    try {
+        writeMedia(fixture, "books", "Source.epub", await createEpub());
+        indexBooks(fixture);
+        const original = fixture.db.prepare("SELECT * FROM books").get();
+        const membership = fixture.db.prepare("SELECT * FROM book_files").all();
+        const state = fixture.db.prepare("SELECT * FROM book_index_state").get();
+
+        const duplicatePath = writeMedia(fixture, "books", "Duplicate.epub", await createEpub());
+        assert.equal(runIndexer(fixture, "src/indexers/fileIndexer.js").status, 0);
+        // Model two case-variant extensions from a case-sensitive archive on any host.
+        fixture.db.prepare("UPDATE files SET relative_path = 'Source.EPUB' WHERE path = ?").run(duplicatePath);
+        const result = runIndexer(fixture, "src/indexers/bookIndexer.js");
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /Conflicting formats for source: Source/);
+        assert.deepEqual(fixture.db.prepare("SELECT * FROM books").get(), original);
+        assert.deepEqual(fixture.db.prepare("SELECT * FROM book_files").all(), membership);
+        assert.deepEqual(fixture.db.prepare("SELECT * FROM book_index_state").get(), state);
+    } finally { closeFixture(fixture); }
+});
+
 it("preserves book metadata after failed EPUB updates and missing mounts; pruning removes only empty books", async () => {
     const fixture = createFixture();
     try {

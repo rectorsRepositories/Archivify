@@ -51,8 +51,12 @@ async function routeBooks(req, res, url) {
             res.end(req.method === "HEAD" ? undefined : cover.image_data);
         }
     } else {
-        const format = match[2] === "content" ? "epub" : url.searchParams.has("format")
-            ? url.searchParams.get("format") : book.formats[0]?.format || "epub";
+        let format = "epub";
+        if (match[2] !== "content") {
+            format = url.searchParams.has("format")
+                ? url.searchParams.get("format")
+                : book.formats[0]?.format || "epub";
+        }
         if (!["epub", "txt"].includes(format)) throw new HttpError(400, "invalid_parameter", "Book format must be epub or txt.");
         const file = books.bookFiles(id).find((value) => value.format === format);
         if (!file) throw new HttpError(404, "format_unavailable", "The requested book format is unavailable.");

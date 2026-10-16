@@ -125,6 +125,45 @@ describe("file indexer", () => {
         }
     });
 
+    it("retains stale rows when a broken file link makes a pruned scan incomplete", () => {
+        const fixture = createFixture();
+        try {
+            const stalePath = writeMedia(fixture, "music", "Stale.mp3", "stale");
+            writeMedia(fixture, "music", "Keep.mp3", "keep");
+            assert.equal(runIndexer(fixture, script).status, 0);
+            fs.unlinkSync(stalePath);
+
+            const program = `
+                const fs = require("node:fs");
+                const path = require("node:path");
+                const root = path.join(process.env.ARCHIVE_ROOT, "Music");
+                const read = fs.readdirSync;
+                fs.readdirSync = function (directory, ...args) {
+                    const entries = read.call(fs, directory, ...args);
+                    if (directory === root) entries.push({ name: "Broken.mp3",
+                        isDirectory: () => false, isFile: () => false, isSymbolicLink: () => true });
+                    return entries;
+                };
+                process.argv.push("--prune");
+                require("./src/indexers/fileIndexer").runIndexer();
+            `;
+            const incomplete = spawnSync(process.execPath, ["-e", program], {
+                cwd: projectRoot,
+                env: { ...process.env, ARCHIVE_ROOT: fixture.archiveRoot, ARCHIVE_DB: fixture.dbPath },
+                encoding: "utf8",
+            });
+            assert.equal(incomplete.status, 0, incomplete.stderr);
+            assert.match(incomplete.stderr, /Broken\.mp3/);
+            assert.match(incomplete.stderr, /Skipping prune for music/);
+            assert.match(incomplete.stdout, /Unchanged:\s+1/);
+            assert.match(incomplete.stdout, /Errors:\s+1/);
+            assert.match(incomplete.stdout, /Removed:\s+0/);
+            assert.ok(fixture.db.prepare("SELECT id FROM files WHERE path = ?").get(stalePath));
+        } finally {
+            closeFixture(fixture);
+        }
+    });
+
     it("indexes file links without descending through directory links", () => {
         const fixture = createFixture();
         try {

@@ -107,6 +107,30 @@ it("rejects corrupt containers, escaping references, oversized XML, and entity d
     } finally { closeFixture(fixture); }
 });
 
+it("preserves missing, zero, fractional, and invalid numeric metadata distinctions", async () => {
+    const fixture = createFixture();
+    try {
+        const cases = [
+            { page: null, position: null, expectedPage: null, expectedPosition: null },
+            { page: "", position: "", expectedPage: null, expectedPosition: null },
+            { page: "0", position: "0", expectedPage: null, expectedPosition: 0 },
+            { page: "123", position: "1.5", expectedPage: 123, expectedPosition: 1.5 },
+            { page: "1.5", position: "-1", expectedPage: null, expectedPosition: null },
+            { page: "-1", position: "Infinity", expectedPage: null, expectedPosition: null },
+            { page: "9007199254740992", position: "invalid", expectedPage: null, expectedPosition: null },
+        ];
+        for (const [index, sample] of cases.entries()) {
+            const metadata = (sample.page == null ? "" : `<meta property="schema:numberOfPages">${sample.page}</meta>`)
+                + (sample.position == null ? "" : `<meta name="calibre:series_index" content="${sample.position}"/>`);
+            const file = writeMedia(fixture, "books", `Numbers${index}.epub`, await createEpub({ metadata, cover: false }));
+            const book = await readEpubMetadata(file);
+            assert.equal(book.page_count, sample.expectedPage, `page count for case ${index}`);
+            assert.equal(book.page_count_source, sample.expectedPage == null ? null : "epub_metadata");
+            assert.equal(book.series_position, sample.expectedPosition, `series position for case ${index}`);
+        }
+    } finally { closeFixture(fixture); }
+});
+
 it("validates ISBN checksums while preserving leading zeros and the ISBN-10 X check digit", () => {
     assert.equal(normalizeIsbn("0-306-40615-2"), "0306406152");
     assert.equal(normalizeIsbn("urn:isbn:9780306406157"), "9780306406157");

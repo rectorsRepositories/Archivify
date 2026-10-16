@@ -134,7 +134,8 @@ function parseGameFile(file) {
     if (parts.length < 2 || parts.some((part) => /\bbios\b/i.test(part))) return null;
 
     const platform = cleanTitle(parts[0]);
-    const title = gameTitleFromStem(path.parse(file.filename).name);
+    const stem = path.parse(file.filename).name;
+    const title = gameTitleFromStem(stem);
     if (!platform || !title) return null;
 
     return {
@@ -142,7 +143,7 @@ function parseGameFile(file) {
         sourceKey: parts.join("/"),
         platform,
         title,
-        stem: path.parse(file.filename).name,
+        stem,
         directory: parts.slice(0, -1).join("/").toLowerCase(),
         filePath: file.path,
     };

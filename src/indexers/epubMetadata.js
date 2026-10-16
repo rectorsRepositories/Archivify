@@ -243,8 +243,10 @@ function packageMetadata(pkg) {
         text(refine(node, "collection-type") || "") === "series");
     const value = (name) => dc(name).map(text).filter(Boolean).join("; ") || null;
     const publicationDate = text(dc("date").find((node) => !node.attrs.event || node.attrs.event === "publication") || "") || null;
-    const pageCount = Number(property("schema:numberOfPages") || property("page-count"));
+    const declaredPageCount = Number(property("schema:numberOfPages") || property("page-count"));
+    const pageCount = Number.isSafeInteger(declaredPageCount) && declaredPageCount > 0 ? declaredPageCount : null;
     const seriesPosition = collection ? text(refine(collection, "group-position") || "") : property("calibre:series_index");
+    const numericSeriesPosition = seriesPosition != null && seriesPosition !== "" ? Number(seriesPosition) : NaN;
     const fields = {
         title: main ? text(main) || null : null,
         subtitle: subtitle ? text(subtitle) || null : null,
@@ -253,9 +255,9 @@ function packageMetadata(pkg) {
         publication_date: publicationDate, publication_year: dateYear(publicationDate),
         original_publication_year: dateYear(property("original-publication-year")),
         series_name: collection ? text(collection) : property("calibre:series"),
-        series_position: seriesPosition != null && seriesPosition !== "" && Number.isFinite(Number(seriesPosition)) && Number(seriesPosition) >= 0 ? Number(seriesPosition) : null,
-        page_count: Number.isSafeInteger(pageCount) && pageCount > 0 ? pageCount : null,
-        page_count_source: Number.isSafeInteger(pageCount) && pageCount > 0 ? "epub_metadata" : null,
+        series_position: Number.isFinite(numericSeriesPosition) && numericSeriesPosition >= 0 ? numericSeriesPosition : null,
+        page_count: pageCount,
+        page_count_source: pageCount != null ? "epub_metadata" : null,
         page_marker_count: null, word_count: null,
         rights: value("rights"), epub_version: pkg.attrs.version || null,
         layout: property("rendition:layout"),
@@ -295,7 +297,8 @@ async function readEpubMetadata(filePath) {
     const { read, entries, zip } = publication;
     try {
         const container = parseXml(await read("META-INF/container.xml"));
-        const rootfile = descendants(container, "rootfile").find((node) => node.attrs["media-type"] === "application/oebps-package+xml") || descendants(container, "rootfile")[0];
+        const rootfiles = descendants(container, "rootfile");
+        const rootfile = rootfiles.find((node) => node.attrs["media-type"] === "application/oebps-package+xml") || rootfiles[0];
         if (!rootfile) throw new Error("EPUB container has no package document.");
         const opfPath = memberPath("container.xml", rootfile.attrs["full-path"] || "");
         const pkg = parseXml(await read(opfPath));

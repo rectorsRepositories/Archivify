@@ -215,9 +215,10 @@ async function runBookIndexer({ force = false, metadataReader = readEpubMetadata
         groups.get(key).push(file);
     }
     for (const [key, files] of groups) {
+        const hasConflictingFormats = new Set(files.map((file) => file.extension)).size !== files.length;
         let fingerprint = "";
         try {
-            if (new Set(files.map((file) => file.extension)).size !== files.length) throw new Error("Conflicting formats for source: " + key);
+            if (hasConflictingFormats) throw new Error("Conflicting formats for source: " + key);
             const locations = new Map();
             const signatures = [];
             for (const file of files) {
@@ -257,7 +258,7 @@ async function runBookIndexer({ force = false, metadataReader = readEpubMetadata
             console.log("+ books: " + key);
         } catch (error) {
             // A conflicting duplicate must not overwrite a valid membership set.
-            if (new Set(files.map((file) => file.extension)).size === files.length) saveBook(key, files, null, fingerprint, error);
+            if (!hasConflictingFormats) saveBook(key, files, null, fingerprint, error);
             stats.errors++;
             console.error("! books: " + key + ": " + error.message);
         }
