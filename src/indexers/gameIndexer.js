@@ -13,7 +13,7 @@ const GAME_EXTENSIONS = new Set([
     ".nes", ".fds", ".unf", ".unif", ".sfc", ".smc", ".n64", ".v64", ".z64",
     ".gb", ".gbc", ".gba", ".nds", ".3ds", ".cia", ".xci", ".nsp", ".wud", ".wux",
     ".sms", ".gg", ".sg", ".md", ".smd", ".gen", ".32x", ".pce", ".sgx",
-    ".a26", ".a52", ".a78", ".lnx", ".j64", ".ngp", ".ngc", ".ws", ".wsc",
+    ".a26", ".a52", ".a78", ".lnx", ".j64", ".ngp", ".ngc", ".ws", ".wsc",".zip"
 ]);
 
 for (const value of (process.env.GAME_EXTRA_EXTENSIONS || "").split(/[\s,]+/).filter(Boolean)) {
